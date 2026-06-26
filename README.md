@@ -1,0 +1,3 @@
+# simants
+
+Ant simulation
