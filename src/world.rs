@@ -1,14 +1,11 @@
-use crate::{Ant, CellContents};
-use raylib::{
-    ffi::{Color, Vector2},
-    prelude::{RaylibDraw as _, RaylibDrawHandle},
-};
+use crate::*;
 
 pub struct World {
     pub width: i32,
     pub height: i32,
     pub grid: Grid<CellContents>,
     pub ants: Vec<Ant>,
+    current_dt: f32,
 }
 
 impl World {
@@ -32,16 +29,26 @@ impl World {
 
         for x in 0..w {
             for y in 0..h {
+                let Some(cell) = grid.get_mut(x, y) else {
+                    continue;
+                };
+
                 // Draw obstacles around screen border
                 let is_border = x == 0 || x == w - 1 || y == 0 || y == h - 1;
                 // Draws an obstacle, in the form of a line in the middle of the screen,
                 // that is half the height and centerted horizontally and vertically
                 let is_mid_vert = x_range.contains(&x) && y_range.contains(&y);
 
-                if (is_border || is_mid_vert)
-                    && let Some(cell) = grid.get_mut(x, y)
-                {
-                    cell.contents = CellContents::Obstacle;
+                if is_border {
+                    cell.contents = CellContents::Obstacle {
+                        kind: Obstacle::Border,
+                    };
+                    continue;
+                }
+                if is_mid_vert {
+                    cell.contents = CellContents::Obstacle {
+                        kind: Obstacle::Normal,
+                    };
                     continue;
                 }
             }
@@ -52,10 +59,12 @@ impl World {
             width,
             height,
             grid,
+            current_dt: 0.0,
         }
     }
 
     pub fn update(&mut self, dt: f32) {
+        self.current_dt = dt;
         for ant in &mut self.ants {
             ant.update(dt, &mut self.grid);
         }
@@ -66,17 +75,70 @@ impl World {
 
         for y in 0..self.height {
             for x in 0..self.width {
-                if let Some(cell) = self.grid.get(x, y)
-                    && matches!(cell.contents, CellContents::Obstacle)
-                {
-                    d.draw_rectangle(
-                        x * cell_size,
-                        y * cell_size,
-                        cell_size,
-                        cell_size,
-                        Color::RED,
-                    );
-                }
+                let Some(cell) = self.grid.get_mut(x, y) else {
+                    continue;
+                };
+
+                match &mut cell.contents {
+                    CellContents::Empty => {
+                        d.draw_rectangle(
+                            x * cell_size,
+                            y * cell_size,
+                            cell_size,
+                            cell_size,
+                            BACKGROUND_COLOR,
+                        );
+                    }
+                    CellContents::Pheromone {
+                        kind,
+                        strength: lifetime,
+                    } => {
+                        *lifetime = (*lifetime - self.current_dt).max(0.0);
+
+                        if *lifetime <= 0.0 {
+                            cell.contents = CellContents::Empty;
+                            continue;
+                        }
+
+                        if SHOW_PHEROMONES {
+                            let mut color = match kind {
+                                Pheromone::Searching => PHEROMONE_FORAGING_COLOR,
+                                Pheromone::ToHome => PHEROMONE_RETURNING_FOOD_COLOR,
+                                Pheromone::ToFood => unimplemented!(),
+                            };
+
+                            debug_assert!(*lifetime >= 0.0);
+
+                            let alpha_percentage = *lifetime / PHEROMONE_MAX_LIFETIME_SECONDS;
+                            color.a = (alpha_percentage * MAX_RGBA_VALUE as f32) as u8;
+
+                            d.draw_circle(
+                                x * self.grid.cell_size + 2,
+                                y * self.grid.cell_size + 2,
+                                0.99999,
+                                color,
+                            );
+                        }
+                    }
+                    CellContents::Obstacle { kind } => {
+                        let should_draw = if matches!(kind, Obstacle::Border) {
+                            SHOW_BORDER
+                        } else {
+                            true
+                        };
+
+                        if should_draw {
+                            d.draw_rectangle(
+                                x * cell_size,
+                                y * cell_size,
+                                cell_size,
+                                cell_size,
+                                OBSTACLE_COLOR,
+                            );
+                        }
+                    }
+                    CellContents::Food(_food) => unimplemented!(),
+                };
             }
         }
 

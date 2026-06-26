@@ -1,41 +1,91 @@
 mod world;
 
+pub(crate) use raylib::prelude::*;
+
 use crate::world::{Grid, World};
 use rand::RngExt as _;
-use raylib::prelude::*;
+use std::ops::Range;
 
-const NUM_ANTS: usize = 2000;
-const SCREEN_WIDTH: i32 = 800;
-const SCREEN_HEIGHT: i32 = 600;
-const CELL_SIZE: i32 = 4;
+/* ----------------------------------- */
+/* ------- Simulation Options -------- */
+/* ----------------------------------- */
 
+// How many ants to initially render
+pub(crate) const NUM_ANTS: usize = 500;
+// We multiply CELL_SIZE by this value, which determines how large ants are.
+pub(crate) const ANT_SIZE_MULTIPLIER: i32 = 4;
 // Pixels per second
-const ANT_MAX_SPEED: f32 = 40.0;
-// How fast they can turn
-// Hihger value creates sharper turns
-const ANT_MAX_TURN_FORCE: f32 = 30.0;
-// The angle range an ant can turn..
-// The range will become `random_rangge(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)`
-// Ideally should be less than 180.0
-const ANT_TURN_ANGLE: f32 = 30.0;
+pub(crate) const ANT_MAX_SPEED: f32 = 40.0;
+// How fast can an ant turn. The higher this value, the longer it will take an ant to face a
+// difffernt direction.
+pub(crate) const ANT_MAX_TURN_FORCE: f32 = 20.0;
+// In radians
+pub(crate) const ANT_TURN_ANGLE_RANGE: Range<f32> = -45.0..45.0;
+// When an ant is at an obstacle, we furst flip the current direction it is facingg, so we need to
+// turn using some degree of random variance as to prevent us from bouncing back and forth in corners.
+// We call this the 'panic' angle range. In radians.
+pub(crate) const ANT_OBSTACLE_PANIC_ANGLE_RANGE: Range<f32> = -20.0f32..20.0f32;
+// Should be >= 0.0 and <= 1.0. For example, if the value is === 0.2 then there is a 20% chance o pausing.
+pub(crate) const ANT_PAUSE_PROBABILITY: f64 = 0.0019;
+// Pheromones slowly evaporate over time.
+pub(crate) const PHEROMONE_MAX_LIFETIME_SECONDS: f32 = 10.0;
 
-// For rendering our ant triangle
-const ANT_LENGTH: f32 = 10.0;
-const ANT_WIDTH: f32 = 6.0;
+/* ----------------------------------- */
+/* ------- Hide/Show Entities -------- */
+/* ----------------------------------- */
+
+pub(crate) const SHOW_BORDER: bool = false;
+pub(crate) const SHOW_PHEROMONES: bool = false;
+
+/* ----------------------------------- */
+/* ------- Window/GUI Options -------- */
+/* ----------------------------------- */
+
+pub(crate) const TITLE: &str = "Ant Simulation";
+// If either SCREEN_WIDTH or SCREEN_HEIGHT is <= 0 we use full screen width
+pub(crate) const SCREEN_WIDTH: i32 = 1200;
+// If either SCREEN_WIDTH or SCREEN_HEIGHT is <= 0 we use full screen width
+pub(crate) const SCREEN_HEIGHT: i32 = 800;
+// N x N pixels
+pub(crate) const CELL_SIZE: i32 = 4;
+pub(crate) const MAX_RGBA_VALUE: u8 = 255;
+
+/* ----------------------------------- */
+/* ------- Color Options ------------- */
+/* ----------------------------------- */
+
+pub(crate) const BACKGROUND_COLOR: Color = Color::BLACK;
+pub(crate) const ANT_FORAGING_COLOR: Color = Color::GREEN;
+pub(crate) const ANT_RETURNING_FOOD_COLOR: Color = Color::YELLOW;
+pub(crate) const PHEROMONE_FORAGING_COLOR: Color = Color::WHITE;
+pub(crate) const PHEROMONE_RETURNING_FOOD_COLOR: Color = Color::ROYALBLUE;
+pub(crate) const OBSTACLE_COLOR: Color = Color::DARKMAGENTA;
 
 fn main() {
-    let (mut rl, thread) = raylib::init()
-        .size(SCREEN_WIDTH, SCREEN_HEIGHT)
-        .title("Ant Simulation")
-        .build();
+    let mut rl_builder = raylib::init();
+    rl_builder.title(TITLE);
 
-    let mut world = World::new(SCREEN_WIDTH, SCREEN_HEIGHT, CELL_SIZE, NUM_ANTS);
+    if SCREEN_WIDTH <= 0 || SCREEN_HEIGHT <= 0 {
+        rl_builder.fullscreen();
+    } else {
+        rl_builder.size(SCREEN_WIDTH, SCREEN_HEIGHT);
+    }
+
+    let (mut rl, thread) = rl_builder.build();
+    rl.set_target_fps(60);
+
+    let mut world = World::new(
+        rl.get_screen_width(),
+        rl.get_screen_height(),
+        CELL_SIZE,
+        NUM_ANTS,
+    );
 
     while !rl.window_should_close() {
         world.update(rl.get_frame_time());
 
         let mut drawing = rl.begin_drawing(&thread);
-        drawing.clear_background(Color::BLACK);
+        drawing.clear_background(BACKGROUND_COLOR);
 
         world.draw(&mut drawing);
     }
@@ -50,6 +100,7 @@ pub struct Ant {
     pub state: AntState,
     pub angle: f32,
     pub steering_force: Vector2,
+    pub paused_for: Option<f32>,
     rng: rand::rngs::ThreadRng,
 }
 
@@ -70,15 +121,25 @@ impl Ant {
     }
 
     pub fn update(&mut self, dt: f32, grid: &mut Grid<CellContents>) {
+        if let Some(ref mut paused_for) = self.paused_for {
+            *paused_for -= dt;
+            if *paused_for <= 0.0 {
+                self.paused_for = None;
+            }
+            return;
+        }
+        if self.should_pause(ANT_PAUSE_PROBABILITY) {
+            self.paused_for = Some(0.8);
+            return;
+        }
+
         let mut desired_velocity = self.velocity;
 
         match self.state {
             AntState::Foraging => {
-                self.angle = self
-                    .rng
-                    .random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
-                    .to_radians();
+                self.angle = self.rng.random_range(ANT_TURN_ANGLE_RANGE).to_radians();
                 desired_velocity = desired_velocity.rotate(self.angle);
+                self.drop_pheromone(grid);
 
                 /*
                 // Check if food is found.
@@ -91,10 +152,6 @@ impl Ant {
             AntState::ReturningHome => unimplemented!(),
         };
 
-        if self.is_at_obstacle(grid) {
-            self.turn_around();
-        }
-
         // Steering force using Reynolds steering formula
         desired_velocity = desired_velocity.normalize() * ANT_MAX_SPEED;
         let steering_force = desired_velocity - self.velocity;
@@ -102,41 +159,88 @@ impl Ant {
         self.steering_force = steering_force.scale(ANT_MAX_TURN_FORCE * dt);
         self.velocity += self.steering_force;
         self.velocity = self.velocity.normalize() * ANT_MAX_SPEED;
-        self.position += self.velocity * dt;
+
+        let next_position = self.position + self.velocity * dt;
+
+        if self.is_at_obstacle(next_position, 0.0, grid) {
+            self.turn_around();
+        } else {
+            self.position = next_position;
+        }
+    }
+
+    fn turn_around(&mut self) {
+        self.velocity *= -1.0;
+        let panic_angle = self
+            .rng
+            .random_range(ANT_OBSTACLE_PANIC_ANGLE_RANGE)
+            .to_radians();
+        self.velocity = self.velocity.rotate(panic_angle);
+    }
+
+    pub fn drop_pheromone(&mut self, grid: &mut Grid<CellContents>) {
+        let x = (self.position.x / grid.cell_size as f32).floor() as i32;
+        let y = (self.position.y / grid.cell_size as f32).floor() as i32;
+
+        if let Some(cell) = grid.get_mut(x, y)
+            && !matches!(cell.contents, CellContents::Obstacle { .. })
+        {
+            cell.contents = CellContents::Pheromone {
+                kind: match self.state {
+                    AntState::Foraging => Pheromone::Searching,
+                    AntState::ReturningHome => Pheromone::ToHome,
+                },
+                strength: PHEROMONE_MAX_LIFETIME_SECONDS,
+            };
+        }
+    }
+
+    pub fn is_at_obstacle(
+        &mut self,
+        position: Vector2,
+        look_ahead_distance: f32,
+        grid: &Grid<CellContents>,
+    ) -> bool {
+        let forward_direction = self.velocity.normalize();
+        let check_position = position + (forward_direction * look_ahead_distance);
+        let x = (check_position.x / grid.cell_size as f32).floor() as i32;
+        let y = (check_position.y / grid.cell_size as f32).floor() as i32;
+
+        grid.get(x, y)
+            .map(|cell| matches!(cell.contents, CellContents::Obstacle { .. }))
+            .unwrap_or(true)
+    }
+
+    /// `probability_of_pausing` should be >= 0.0 and <= 1.0.
+    /// If `probability_of_pausing` === 0.2 then there is a 20% chance o pausing.
+    pub fn should_pause(&mut self, probability_of_pausing: f64) -> bool {
+        let roll: f64 = self.rng.random();
+        roll < probability_of_pausing
     }
 
     pub fn draw(&self, d: &mut RaylibDrawHandle) {
-        let color = match self.state {
-            AntState::Foraging => Color::GREEN,
-            AntState::ReturningHome => Color::YELLOW,
+        let color = if self.paused_for.is_some() {
+            Color::YELLOWGREEN
+        } else {
+            match self.state {
+                AntState::Foraging => ANT_FORAGING_COLOR,
+                AntState::ReturningHome => ANT_RETURNING_FOOD_COLOR,
+            }
         };
 
         let forward = self.velocity.normalize();
         let right = Vector2::new(-forward.y, forward.x);
 
-        let spear = self.position + (forward * (ANT_LENGTH / 2.0));
+        let ant_length = (CELL_SIZE * ANT_SIZE_MULTIPLIER) as f32;
+        let ant_width = ant_length / 2.0;
+
+        let spear = self.position + (forward * (ant_length / 2.0));
         let left_back =
-            self.position - (forward * (ANT_LENGTH / 2.0)) - (right * (ANT_WIDTH / 2.0));
+            self.position - (forward * (ant_length / 2.0)) - (right * (ant_width / 2.0));
         let right_back =
-            self.position - (forward * (ANT_LENGTH / 2.0)) + (right * (ANT_WIDTH / 2.0));
+            self.position - (forward * (ant_length / 2.0)) + (right * (ant_width / 2.0));
 
         d.draw_triangle(spear, left_back, right_back, color);
-    }
-
-    fn turn_around(&mut self) {
-        self.velocity *= -1.0;
-    }
-
-    fn is_at_obstacle(&mut self, grid: &Grid<CellContents>) -> bool {
-        let look_ahead_distance = ANT_LENGTH / 2.0;
-        let forward_direction = self.velocity.normalize();
-        let check_position = self.position + (forward_direction * look_ahead_distance);
-        let x = (check_position.x / grid.cell_size as f32).floor() as i32;
-        let y = (check_position.y / grid.cell_size as f32).floor() as i32;
-
-        grid.get(x, y)
-            .map(|cell| matches!(cell.contents, CellContents::Obstacle))
-            .unwrap_or(true)
     }
 }
 
@@ -157,15 +261,29 @@ pub struct Food {
 #[derive(Default, Debug, Clone, Copy)]
 pub enum Pheromone {
     #[default]
-    Foraging,
-    Returning,
+    Searching,
+    ToFood,
+    ToHome,
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+pub enum Obstacle {
+    #[default]
+    Normal,
+    Border,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
 pub enum CellContents {
     #[default]
     Empty,
-    Pheromone(Pheromone),
+    Pheromone {
+        kind: Pheromone,
+        // strength can be viewed as 'real world seconds to live for'
+        strength: f32,
+    },
     Food(Food),
-    Obstacle,
+    Obstacle {
+        kind: Obstacle,
+    },
 }
