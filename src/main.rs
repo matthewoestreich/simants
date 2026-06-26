@@ -18,7 +18,7 @@ pub(crate) const ANT_SIZE_MULTIPLIER: i32 = 4;
 pub(crate) const ANT_MAX_SPEED: f32 = 40.0;
 // How fast can an ant turn. The higher this value, the longer it will take an ant to face a
 // difffernt direction.
-pub(crate) const ANT_MAX_TURN_FORCE: f32 = 20.0;
+pub(crate) const ANT_MAX_TURN_FORCE: f32 = 30.0;
 // In radians
 pub(crate) const ANT_TURN_ANGLE_RANGE: Range<f32> = -45.0..45.0;
 // When an ant is at an obstacle, we furst flip the current direction it is facingg, so we need to
