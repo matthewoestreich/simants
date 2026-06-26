@@ -5,8 +5,24 @@ use crate::world::{Grid, World};
 use rand::RngExt as _;
 use raylib::prelude::*;
 
+const NUM_ANTS: usize = 1000;
 const SCREEN_WIDTH: i32 = 800;
 const SCREEN_HEIGHT: i32 = 600;
+const CELL_SIZE: i32 = 4;
+
+// Pixels per second
+const ANT_MAX_SPEED: f32 = 40.0;
+// How fast they can turn
+// Hihger value creates sharper turns
+const ANT_MAX_TURN_FORCE: f32 = 30.0;
+// The angle range an ant can turn..
+// The range will become `random_rangge(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)`
+// Ideally should be less than 180.0
+const ANT_TURN_ANGLE: f32 = 30.0;
+
+// For rendering our ant triangle
+const ANT_LENGTH: f32 = 10.0;
+const ANT_WIDTH: f32 = 6.0;
 
 fn main() {
     let (mut rl, thread) = raylib::init()
@@ -14,7 +30,7 @@ fn main() {
         .title("Ant Simulation")
         .build();
 
-    let mut world = World::new(SCREEN_WIDTH, SCREEN_HEIGHT, 4, 100);
+    let mut world = World::new(SCREEN_WIDTH, SCREEN_HEIGHT, CELL_SIZE, NUM_ANTS);
 
     while !rl.window_should_close() {
         world.update(rl.get_frame_time());
@@ -22,168 +38,106 @@ fn main() {
         let mut drawing = rl.begin_drawing(&thread);
         drawing.clear_background(Color::BLACK);
 
-        println!("{:?}", world.ants[0]);
-
-        draw_world(&world, &mut drawing);
+        world.draw(&mut drawing);
     }
 }
 
-fn draw_world(world: &World, d: &mut RaylibDrawHandle) {
-    let cell_size = world.grid.cell_size;
-
-    for y in 0..world.height {
-        for x in 0..world.width {
-            if let Some(cell) = world.grid.get(x, y)
-                && matches!(cell.contents, CellContents::Obstacle)
-            {
-                d.draw_rectangle(
-                    x * cell_size,
-                    y * cell_size,
-                    cell_size,
-                    cell_size,
-                    Color::RED,
-                );
-            }
-        }
-    }
-
-    for ant in &world.ants {
-        d.draw_circle_v(ant.position, 4.0, Color::GREEN);
-        let head_pos = ant.position
-            + Vector2::new(
-                ant.forward_direction.x.cos() * 6.0,
-                ant.forward_direction.y.sin() * 6.0,
-            );
-        d.draw_circle_v(head_pos, 2.0, Color::YELLOW);
-    }
-}
-
-pub struct AntSettings;
-
-#[allow(dead_code)]
-impl AntSettings {
-    const SPEED: f32 = 30.0;
-    const ACCELERATION: f32 = 40.0;
-    const RANDOM_STEER_MAX_DURATION: f32 = 10.0;
-    const RANDOM_STEER_STRENGTH: f32 = 10.0;
-}
-
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone)]
 pub struct Ant {
     pub id: i32,
     pub position: Vector2,
-    pub forward_direction: Vector2,
     pub velocity: Vector2,
     pub start_position: Vector2,
     pub state: AntState,
-    pub random_steer_timer: f32,
-    pub random_steer_force: Vector2,
+    pub angle: f32,
+    pub steering_force: Vector2,
+    rng: rand::rngs::ThreadRng,
 }
 
 impl Ant {
     pub fn new(position: Vector2) -> Self {
-        // Facing right
-        let forward_direction = Vector2::new(1.0, 0.0);
-        let velocity = forward_direction * AntSettings::SPEED;
+        let mut rng = rand::rng();
+        let angle = rng.random_range(0.0f32..360.0f32).to_radians();
+        let velocity = Vector2::new(angle.cos(), angle.sin()) * ANT_MAX_SPEED;
 
         Self {
             position,
             start_position: position,
+            rng,
+            angle,
             velocity,
             ..Self::default()
         }
     }
 
     pub fn update(&mut self, dt: f32, grid: &mut Grid<CellContents>) {
-        self.random_steer_timer -= dt;
-        self.handle_random_steering();
-        self.handle_movement(dt);
+        let mut desired_velocity = self.velocity;
 
-        let x = (self.position.x / grid.cell_size as f32).floor() as i32;
-        let y = (self.position.y / grid.cell_size as f32).floor() as i32;
+        match self.state {
+            AntState::Foraging => {
+                self.angle = self
+                    .rng
+                    .random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
+                    .to_radians();
+                desired_velocity = desired_velocity.rotate(self.angle);
 
-        let hit_obstacle = grid
-            .get_mut(x, y)
-            .map(|cell| matches!(cell.contents, CellContents::Obstacle))
-            .unwrap_or(true);
-
-        if hit_obstacle {
-            println!("Ant at {:?} is over grid cell at ({x},{y})", self.position);
-            self.velocity = -self.velocity;
-            self.forward_direction = self.velocity.normalize();
-        }
-    }
-
-    fn handle_random_steering(&mut self) {
-        if self.random_steer_timer <= 0.0 {
-            let mut rng = rand::rng();
-            let rsmd = AntSettings::RANDOM_STEER_MAX_DURATION;
-            self.random_steer_timer = rng.random_range(rsmd / 3.0..rsmd);
-            self.random_steer_force = self.get_random_direction(self.forward_direction)
-                * AntSettings::RANDOM_STEER_STRENGTH;
-        }
-    }
-
-    fn handle_movement(&mut self, dt: f32) {
-        let steer_force = self.random_steer_force;
-
-        let desired_velocity = if steer_force.length() > 0.0001 {
-            steer_force.normalize() * AntSettings::SPEED
-        } else {
-            Vector2::zero()
-        };
-
-        // SteerTowards
-        let mut steering = desired_velocity - self.velocity;
-        let steering_len = steering.length();
-        if steering_len > AntSettings::ACCELERATION {
-            steering *= AntSettings::ACCELERATION / steering_len;
-        }
-
-        self.velocity += steering * dt;
-
-        let speed = self.velocity.length();
-        if speed > AntSettings::SPEED {
-            self.velocity *= AntSettings::SPEED / speed;
-        }
-        // 4. forward dir (Unity line)
-        let forward = if self.velocity.length() > 0.0001 {
-            self.velocity.normalize()
-        } else {
-            Vector2::new(1.0, 0.0)
-        };
-
-        // 5. movement integration (Unity line)
-        self.position += self.velocity * dt;
-        self.forward_direction = forward;
-    }
-
-    fn get_random_direction(&self, reference: Vector2) -> Vector2 {
-        let reference = reference.normalize();
-
-        let mut best = Vector2::zero();
-        let mut best_dot = -1.0;
-
-        for _ in 0..4 {
-            let rand = self.random_unit_vector(); // already unit length
-            let dot = reference.x * rand.x + reference.y * rand.y;
-
-            if dot > best_dot {
-                best_dot = dot;
-                best = rand;
+                /*
+                // Check if food is found.
+                if self.is_at_food(grid) {
+                    // pick up food
+                    self.state = AntState::ReturningHome;
+                }
+                */
             }
+            AntState::ReturningHome => unimplemented!(),
+        };
+
+        if self.is_at_obstacle(grid) {
+            self.turn_around();
         }
 
-        best
+        // Steering force using Reynolds steering formula
+        desired_velocity = desired_velocity.normalize() * ANT_MAX_SPEED;
+        let steering_force = desired_velocity - self.velocity;
+
+        self.steering_force = steering_force.scale(ANT_MAX_TURN_FORCE * dt);
+        self.velocity += self.steering_force;
+        self.velocity = self.velocity.normalize() * ANT_MAX_SPEED;
+        self.position += self.velocity * dt;
     }
 
-    fn random_unit_vector(&self) -> Vector2 {
-        let angle = rand::random::<f32>() * std::f32::consts::TAU;
+    pub fn draw(&self, d: &mut RaylibDrawHandle) {
+        let color = match self.state {
+            AntState::Foraging => Color::GREEN,
+            AntState::ReturningHome => Color::YELLOW,
+        };
 
-        Vector2 {
-            x: angle.cos(),
-            y: angle.sin(),
-        }
+        let forward = self.velocity.normalize();
+        let right = Vector2::new(-forward.y, forward.x);
+
+        let spear = self.position + (forward * (ANT_LENGTH / 2.0));
+        let left_back =
+            self.position - (forward * (ANT_LENGTH / 2.0)) - (right * (ANT_WIDTH / 2.0));
+        let right_back =
+            self.position - (forward * (ANT_LENGTH / 2.0)) + (right * (ANT_WIDTH / 2.0));
+
+        d.draw_triangle(spear, left_back, right_back, color);
+    }
+
+    fn turn_around(&mut self) {
+        self.velocity *= -1.0;
+    }
+
+    fn is_at_obstacle(&mut self, grid: &Grid<CellContents>) -> bool {
+        let look_ahead_distance = ANT_LENGTH / 2.0;
+        let forward_direction = self.velocity.normalize();
+        let check_position = self.position + (forward_direction * look_ahead_distance);
+        let x = (check_position.x / grid.cell_size as f32).floor() as i32;
+        let y = (check_position.y / grid.cell_size as f32).floor() as i32;
+
+        grid.get(x, y)
+            .map(|cell| matches!(cell.contents, CellContents::Obstacle))
+            .unwrap_or(true)
     }
 }
 
@@ -191,7 +145,7 @@ impl Ant {
 pub enum AntState {
     #[default]
     Foraging,
-    ReturningFood,
+    ReturningHome,
 }
 
 #[derive(Default, Debug, Clone, Copy)]

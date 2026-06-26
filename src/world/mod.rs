@@ -1,5 +1,8 @@
 use crate::{Ant, CellContents};
-use raylib::ffi::Vector2;
+use raylib::{
+    ffi::{Color, Vector2},
+    prelude::{RaylibDraw as _, RaylibDrawHandle},
+};
 
 pub struct World {
     pub width: i32,
@@ -17,12 +20,26 @@ impl World {
 
         let w = width / cell_size;
         let h = height / cell_size;
+        let mid_x = w / 2;
+        let line_length = h / 2;
+        let line_start_y = (h - line_length) / 2;
+        let line_end_y = line_start_y + line_length;
+
         for x in 0..w {
             for y in 0..h {
                 if (x == 0 || x == w - 1 || y == 0 || y == h - 1)
                     && let Some(cell) = grid.get_mut(x, y)
                 {
                     cell.contents = CellContents::Obstacle;
+                    continue;
+                }
+
+                // Draw vertical line
+                if ((line_start_y..=line_end_y).contains(&y) && x == mid_x)
+                    && let Some(cell) = grid.get_mut(x, y)
+                {
+                    cell.contents = CellContents::Obstacle;
+                    continue;
                 }
             }
         }
@@ -38,6 +55,30 @@ impl World {
     pub fn update(&mut self, dt: f32) {
         for ant in &mut self.ants {
             ant.update(dt, &mut self.grid);
+        }
+    }
+
+    pub fn draw(&mut self, d: &mut RaylibDrawHandle) {
+        let cell_size = self.grid.cell_size;
+
+        for y in 0..self.height {
+            for x in 0..self.width {
+                if let Some(cell) = self.grid.get(x, y)
+                    && matches!(cell.contents, CellContents::Obstacle)
+                {
+                    d.draw_rectangle(
+                        x * cell_size,
+                        y * cell_size,
+                        cell_size,
+                        cell_size,
+                        Color::RED,
+                    );
+                }
+            }
+        }
+
+        for ant in &self.ants {
+            ant.draw(d);
         }
     }
 }
