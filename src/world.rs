@@ -27,13 +27,16 @@ impl World {
         let line_len = h / 2;
         let line_start_y = (h - line_len) / 2;
         let line_end_y = line_start_y + line_len;
+        let x_range = (mid_w - 1)..=(mid_w + 1);
+        let y_range = line_start_y..=line_end_y;
 
         for x in 0..w {
             for y in 0..h {
                 // Draw obstacles around screen border
                 let is_border = x == 0 || x == w - 1 || y == 0 || y == h - 1;
-                // Draws a line in the middle of the screen, that is half the height and centerted horizontally and vertically
-                let is_mid_vert = x == mid_w && (line_start_y..=line_end_y).contains(&y);
+                // Draws an obstacle, in the form of a line in the middle of the screen,
+                // that is half the height and centerted horizontally and vertically
+                let is_mid_vert = x_range.contains(&x) && y_range.contains(&y);
 
                 if (is_border || is_mid_vert)
                     && let Some(cell) = grid.get_mut(x, y)
