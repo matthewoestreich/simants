@@ -1,65 +1,11 @@
+mod settings;
 mod world;
 
 pub(crate) use raylib::prelude::*;
+pub(crate) use settings::*;
 
 use crate::world::{Grid, World};
 use rand::RngExt as _;
-use std::ops::Range;
-
-/* ----------------------------------- */
-/* ------- Simulation Options -------- */
-/* ----------------------------------- */
-
-// How many ants to initially render
-pub(crate) const NUM_ANTS: usize = 500;
-// We multiply CELL_SIZE by this value, which determines how large ants are.
-pub(crate) const ANT_SIZE_MULTIPLIER: i32 = 4;
-// Pixels per second
-pub(crate) const ANT_MAX_SPEED: f32 = 40.0;
-// How fast can an ant turn. The higher this value, the longer it will take an ant to face a
-// difffernt direction.
-pub(crate) const ANT_MAX_TURN_FORCE: f32 = 30.0;
-// In radians
-pub(crate) const ANT_TURN_ANGLE_RANGE: Range<f32> = -45.0..45.0;
-// When an ant is at an obstacle, we furst flip the current direction it is facingg, so we need to
-// turn using some degree of random variance as to prevent us from bouncing back and forth in corners.
-// We call this the 'panic' angle range. In radians.
-pub(crate) const ANT_OBSTACLE_PANIC_ANGLE_RANGE: Range<f32> = -20.0f32..20.0f32;
-// Should be >= 0.0 and <= 1.0. For example, if the value is === 0.2 then there is a 20% chance o pausing.
-pub(crate) const ANT_PAUSE_PROBABILITY: f64 = 0.0019;
-// Pheromones slowly evaporate over time.
-pub(crate) const PHEROMONE_MAX_LIFETIME_SECONDS: f32 = 10.0;
-
-/* ----------------------------------- */
-/* ------- Hide/Show Entities -------- */
-/* ----------------------------------- */
-
-pub(crate) const SHOW_BORDER: bool = false;
-pub(crate) const SHOW_PHEROMONES: bool = false;
-
-/* ----------------------------------- */
-/* ------- Window/GUI Options -------- */
-/* ----------------------------------- */
-
-pub(crate) const TITLE: &str = "Ant Simulation";
-// If either SCREEN_WIDTH or SCREEN_HEIGHT is <= 0 we use full screen width
-pub(crate) const SCREEN_WIDTH: i32 = 1200;
-// If either SCREEN_WIDTH or SCREEN_HEIGHT is <= 0 we use full screen width
-pub(crate) const SCREEN_HEIGHT: i32 = 800;
-// N x N pixels
-pub(crate) const CELL_SIZE: i32 = 4;
-pub(crate) const MAX_RGBA_VALUE: u8 = 255;
-
-/* ----------------------------------- */
-/* ------- Color Options ------------- */
-/* ----------------------------------- */
-
-pub(crate) const BACKGROUND_COLOR: Color = Color::BLACK;
-pub(crate) const ANT_FORAGING_COLOR: Color = Color::GREEN;
-pub(crate) const ANT_RETURNING_FOOD_COLOR: Color = Color::YELLOW;
-pub(crate) const PHEROMONE_FORAGING_COLOR: Color = Color::WHITE;
-pub(crate) const PHEROMONE_RETURNING_FOOD_COLOR: Color = Color::ROYALBLUE;
-pub(crate) const OBSTACLE_COLOR: Color = Color::DARKMAGENTA;
 
 fn main() {
     let mut rl_builder = raylib::init();
@@ -129,7 +75,7 @@ impl Ant {
             return;
         }
         if self.should_pause(ANT_PAUSE_PROBABILITY) {
-            self.paused_for = Some(0.8);
+            self.paused_for = Some(self.rng.random_range(ANT_PAUSE_FOR_RANGE_IN_SEC));
             return;
         }
 
