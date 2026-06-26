@@ -6,7 +6,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 500;
+pub const NUM_ANTS: usize = 50;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
 pub const ANT_SIZE_MULTIPLIER: i32 = 4;
 // Pixels per second
@@ -32,7 +32,7 @@ pub const PHEROMONE_MAX_LIFETIME_SECONDS: f32 = 10.0;
 /* ----------------------------------- */
 
 pub const SHOW_BORDER: bool = false;
-pub const SHOW_PHEROMONES: bool = false;
+pub const SHOW_PHEROMONES: bool = true;
 
 /* ----------------------------------- */
 /* ------- Window/GUI Options -------- */
