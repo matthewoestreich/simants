@@ -18,24 +18,24 @@ impl World {
 
         let mut grid = Grid::new(width, height, cell_size);
 
+        // Calculate number of cells per width & height pixels
         let w = width / cell_size;
         let h = height / cell_size;
-        let mid_x = w / 2;
-        let line_length = h / 2;
-        let line_start_y = (h - line_length) / 2;
-        let line_end_y = line_start_y + line_length;
+
+        // For drawing vertical line obstacle in mid of screen
+        let mid_w = w / 2;
+        let line_len = h / 2;
+        let line_start_y = (h - line_len) / 2;
+        let line_end_y = line_start_y + line_len;
 
         for x in 0..w {
             for y in 0..h {
-                if (x == 0 || x == w - 1 || y == 0 || y == h - 1)
-                    && let Some(cell) = grid.get_mut(x, y)
-                {
-                    cell.contents = CellContents::Obstacle;
-                    continue;
-                }
+                // Draw obstacles around screen border
+                let is_border = x == 0 || x == w - 1 || y == 0 || y == h - 1;
+                // Draws a line in the middle of the screen, that is half the height and centerted horizontally and vertically
+                let is_mid_vert = x == mid_w && (line_start_y..=line_end_y).contains(&y);
 
-                // Draw vertical line
-                if ((line_start_y..=line_end_y).contains(&y) && x == mid_x)
+                if (is_border || is_mid_vert)
                     && let Some(cell) = grid.get_mut(x, y)
                 {
                     cell.contents = CellContents::Obstacle;
