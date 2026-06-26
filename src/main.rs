@@ -1,11 +1,10 @@
-mod render;
 mod world;
 
 use crate::world::{Grid, World};
 use rand::RngExt as _;
 use raylib::prelude::*;
 
-const NUM_ANTS: usize = 1000;
+const NUM_ANTS: usize = 2000;
 const SCREEN_WIDTH: i32 = 800;
 const SCREEN_HEIGHT: i32 = 600;
 const CELL_SIZE: i32 = 4;
