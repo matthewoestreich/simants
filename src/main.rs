@@ -1,10 +1,12 @@
 mod ant;
 mod settings;
 mod world;
+mod world_entities;
 
 pub(crate) use ant::*;
 pub(crate) use raylib::prelude::*;
 pub(crate) use settings::*;
+pub(crate) use world_entities::*;
 
 use crate::world::World;
 
@@ -19,26 +21,22 @@ fn main() {
     }
 
     let (mut rl, thread) = rl_builder.build();
+    let sw = rl.get_screen_width();
+    let sh = rl.get_screen_height();
 
-    let mut colony = AntColony::new(NUM_ANTS, 5, 10, 10);
-    colony.spawn_ants();
-
-    let mut world = World::new(
-        rl.get_screen_width(),
-        rl.get_screen_height(),
-        CELL_SIZE,
-        colony,
+    let colony = AntColony::new_with_immediate_spawn(
+        NUM_ANTS,
+        5.0 * CELL_SIZE as f32,
+        Vector2::new(sw as f32 / 4.0, sh as f32 / 3.0),
     );
 
-    println!("{}", world.width * world.height);
+    let mut world = World::new(sw, sh, CELL_SIZE, colony);
 
     while !rl.window_should_close() {
         world.update(rl.get_frame_time());
-
-        let mut drawing = rl.begin_drawing(&thread);
-        drawing.clear_background(BACKGROUND_COLOR);
-
-        world.draw(&mut drawing);
+        let mut d = rl.begin_drawing(&thread);
+        d.clear_background(BACKGROUND_COLOR);
+        world.draw(&mut d);
     }
 }
 
@@ -53,42 +51,4 @@ pub fn grid_to_pixel(grid_x: i32, grid_y: i32, cell_size: i32, get_center: bool)
     }
 
     Vector2::new(pixel_x, pixel_y)
-}
-
-#[derive(Default, Debug, Clone, Copy)]
-pub struct Food {
-    pub pos_x: i32,
-    pub pos_y: i32,
-    pub amount: i32,
-}
-
-#[derive(Default, Debug, Clone, Copy)]
-pub enum Pheromone {
-    #[default]
-    Searching,
-    ToFood,
-    ToHome,
-}
-
-#[derive(Default, Debug, Clone, Copy)]
-pub enum Obstacle {
-    #[default]
-    Normal,
-    Border,
-}
-
-#[derive(Default, Debug, Clone, Copy)]
-pub enum CellContents {
-    #[default]
-    Empty,
-    Colony,
-    Pheromone {
-        kind: Pheromone,
-        // strength can be viewed as 'real world seconds to live for'
-        strength: f32,
-    },
-    Food(Food),
-    Obstacle {
-        kind: Obstacle,
-    },
 }

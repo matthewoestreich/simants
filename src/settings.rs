@@ -6,7 +6,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 5000;
+pub const NUM_ANTS: usize = 7000;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
 pub const ANT_SIZE_MULTIPLIER: i32 = 3;
 // Pixels per second
@@ -40,9 +40,9 @@ pub const SHOW_PHEROMONES: bool = true;
 
 pub const TITLE: &str = "Ant Simulation";
 // If either SCREEN_WIDTH or SCREEN_HEIGHT is <= 0 we use full screen width
-pub const SCREEN_WIDTH: i32 = 800;
+pub const SCREEN_WIDTH: i32 = 1200;
 // If either SCREEN_WIDTH or SCREEN_HEIGHT is <= 0 we use full screen width
-pub const SCREEN_HEIGHT: i32 = 600;
+pub const SCREEN_HEIGHT: i32 = 800;
 // N x N pixels
 pub const CELL_SIZE: i32 = 4;
 pub const MAX_RGBA_VALUE: u8 = 255;
@@ -52,7 +52,7 @@ pub const MAX_RGBA_VALUE: u8 = 255;
 /* ----------------------------------- */
 
 pub const BACKGROUND_COLOR: Color = Color::BLACK;
-pub const ANT_FORAGING_COLOR: Color = Color::LIME;
+pub const ANT_FORAGING_COLOR: Color = Color::LIMEGREEN;
 pub const ANT_RETURNING_FOOD_COLOR: Color = Color::YELLOW;
 pub const PHEROMONE_FORAGING_COLOR: Color = Color::DARKGRAY;
 pub const PHEROMONE_RETURNING_FOOD_COLOR: Color = Color::ROYALBLUE;

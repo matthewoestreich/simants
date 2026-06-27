@@ -30,43 +30,28 @@ impl World {
                     continue;
                 };
 
-                // Draw colony
-                let dx = x - colony.position_x;
-                let dy = y - colony.position_y;
-                // Using distance formula squared to avoid slow floating-point square roots
-                let distance_squared = dx * dx + dy * dy;
-                let radius_squared = colony.radius * colony.radius;
-                if distance_squared <= radius_squared {
-                    cell.contents = CellContents::Colony;
+                // Draw obstacles around screen border
+                if x == 0 || x == w - 1 || y == 0 || y == h - 1 {
+                    let kind = Obstacle::Border;
+                    let contents = CellContents::new(Terrain::Obstacle { kind });
+                    cell.contents = contents;
                     continue;
                 }
 
                 // Draw obstacles around screen border
                 if x == 0 || x == w - 1 || y == 0 || y == h - 1 {
-                    cell.contents = CellContents::Obstacle {
-                        kind: Obstacle::Border,
-                    };
-                    continue;
-                }
-                if colony.position_x == x && colony.position_y == y {
-                    cell.contents = CellContents::Colony;
-                    continue;
-                }
-
-                // Draw obstacles around screen border
-                if x == 0 || x == w - 1 || y == 0 || y == h - 1 {
-                    cell.contents = CellContents::Obstacle {
-                        kind: Obstacle::Border,
-                    };
+                    let kind = Obstacle::Normal;
+                    let contents = CellContents::new(Terrain::Obstacle { kind });
+                    cell.contents = contents;
                     continue;
                 }
 
                 // Draws an obstacle, in the form of a line in the middle of the screen,
                 // that is half the height and centerted horizontally and vertically
                 if x_range.contains(&x) && y_range.contains(&y) {
-                    cell.contents = CellContents::Obstacle {
-                        kind: Obstacle::Normal,
-                    };
+                    let kind = Obstacle::Normal;
+                    let contents = CellContents::new(Terrain::Obstacle { kind });
+                    cell.contents = contents;
                     continue;
                 }
             }
@@ -83,12 +68,87 @@ impl World {
 
     pub fn update(&mut self, dt: f32) {
         self.current_dt = dt;
+        for cell in &mut self.grid.cells {
+            cell.contents.searching_strength = (cell.contents.searching_strength - dt).max(0.0);
+            cell.contents.to_home_strength = (cell.contents.to_home_strength - dt).max(0.0);
+        }
         for ant in &mut self.colony.ants {
             ant.update(dt, &mut self.grid);
         }
     }
 
     pub fn draw(&mut self, d: &mut RaylibDrawHandle) {
+        let cell_size = self.grid.cell_size;
+
+        for (index, cell) in &mut self.grid.cells.iter().enumerate() {
+            let (x, y) = self
+                .grid
+                .coords_from_index(index)
+                .expect("if we have an out of bounds index here something went wrong");
+
+            match cell.contents.terrain {
+                Terrain::Obstacle { kind } => {
+                    if !matches!(kind, Obstacle::Border) || SHOW_BORDER {
+                        d.draw_rectangle(
+                            x * cell_size,
+                            y * cell_size,
+                            cell_size,
+                            cell_size,
+                            OBSTACLE_COLOR,
+                        );
+                    }
+                }
+                _ => {
+                    // Draw standard empty background
+                    d.draw_rectangle(
+                        x * cell_size,
+                        y * cell_size,
+                        cell_size,
+                        cell_size,
+                        BACKGROUND_COLOR,
+                    );
+                }
+            };
+
+            if SHOW_PHEROMONES {
+                // If there is searching pheromone here, render it
+                if cell.contents.searching_strength > 0.0 {
+                    let mut color = PHEROMONE_FORAGING_COLOR;
+                    let alpha = cell.contents.searching_strength / PHEROMONE_MAX_LIFETIME_SECONDS;
+                    color.a = (alpha * MAX_RGBA_VALUE as f32) as u8;
+                    d.draw_circle(
+                        x * cell_size + cell_size / 2,
+                        y * cell_size + cell_size / 2,
+                        cell_size as f32 / 4.0,
+                        color,
+                    );
+                }
+                // If there is a return trail here, render it
+                if cell.contents.to_home_strength > 0.0 {
+                    let mut color = PHEROMONE_RETURNING_FOOD_COLOR;
+                    let alpha = cell.contents.to_home_strength / PHEROMONE_MAX_LIFETIME_SECONDS;
+                    color.a = (alpha * MAX_RGBA_VALUE as f32) as u8;
+                    d.draw_circle(
+                        x * cell_size + cell_size / 2,
+                        y * cell_size + cell_size / 2,
+                        cell_size as f32 / 3.0,
+                        color,
+                    );
+                }
+            }
+        }
+
+        // FIRST : Draw ants
+        for ant in &self.colony.ants {
+            ant.draw(d);
+        }
+        // SECOND : Draw colony
+        self.colony.draw(d);
+    }
+
+    /*
+    pub fn draw_og(&mut self, d: &mut RaylibDrawHandle) {
+        // Grid layer processing
         let cell_size = self.grid.cell_size;
 
         for y in 0..self.height {
@@ -98,15 +158,6 @@ impl World {
                 };
 
                 match &mut cell.contents {
-                    CellContents::Colony => {
-                        d.draw_rectangle(
-                            x * cell_size,
-                            y * cell_size,
-                            cell_size,
-                            cell_size,
-                            Color::ORANGERED,
-                        );
-                    }
                     CellContents::Empty => {
                         d.draw_rectangle(
                             x * cell_size,
@@ -169,10 +220,17 @@ impl World {
             }
         }
 
+        /* Environment layer processing */
+        /* DRAWING ORDER IS IMPORTANT HERE! */
+
+        // FIRST : Draw ants
         for ant in &self.colony.ants {
             ant.draw(d);
         }
+        // SECOND : Draw colony
+        self.colony.draw(d);
     }
+    */
 }
 
 /* ------------------------------------------------------------------------------ */
@@ -222,6 +280,17 @@ where
         }
         let i = self.index(x, y);
         Some(&mut self.cells[i])
+    }
+
+    pub fn coords_from_index(&self, index: usize) -> Option<(i32, i32)> {
+        if index >= self.cells.len() {
+            return None;
+        }
+
+        let x = (index as i32) % self.width;
+        let y = (index as i32) / self.width;
+
+        Some((x, y))
     }
 
     fn index(&self, x: i32, y: i32) -> usize {
