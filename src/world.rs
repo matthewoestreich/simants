@@ -4,15 +4,12 @@ pub struct World {
     pub width: i32,
     pub height: i32,
     pub grid: Grid<CellContents>,
-    pub ants: Vec<Ant>,
+    pub colony: AntColony,
     current_dt: f32,
 }
 
 impl World {
-    pub fn new(width: i32, height: i32, cell_size: i32, num_ants: usize) -> Self {
-        let mut ants = Vec::with_capacity(num_ants);
-        ants.resize_with(num_ants, || Ant::new(Vector2::new(100.0, 100.0)));
-
+    pub fn new(width: i32, height: i32, cell_size: i32, colony: AntColony) -> Self {
         let mut grid = Grid::new(width, height, cell_size);
 
         // Calculate number of cells per width & height pixels
@@ -33,19 +30,40 @@ impl World {
                     continue;
                 };
 
-                // Draw obstacles around screen border
-                let is_border = x == 0 || x == w - 1 || y == 0 || y == h - 1;
-                // Draws an obstacle, in the form of a line in the middle of the screen,
-                // that is half the height and centerted horizontally and vertically
-                let is_mid_vert = x_range.contains(&x) && y_range.contains(&y);
+                // Draw colony
+                let dx = x - colony.position_x;
+                let dy = y - colony.position_y;
+                // Using distance formula squared to avoid slow floating-point square roots
+                let distance_squared = dx * dx + dy * dy;
+                let radius_squared = colony.radius * colony.radius;
+                if distance_squared <= radius_squared {
+                    cell.contents = CellContents::Colony;
+                    continue;
+                }
 
-                if is_border {
+                // Draw obstacles around screen border
+                if x == 0 || x == w - 1 || y == 0 || y == h - 1 {
                     cell.contents = CellContents::Obstacle {
                         kind: Obstacle::Border,
                     };
                     continue;
                 }
-                if is_mid_vert {
+                if colony.position_x == x && colony.position_y == y {
+                    cell.contents = CellContents::Colony;
+                    continue;
+                }
+
+                // Draw obstacles around screen border
+                if x == 0 || x == w - 1 || y == 0 || y == h - 1 {
+                    cell.contents = CellContents::Obstacle {
+                        kind: Obstacle::Border,
+                    };
+                    continue;
+                }
+
+                // Draws an obstacle, in the form of a line in the middle of the screen,
+                // that is half the height and centerted horizontally and vertically
+                if x_range.contains(&x) && y_range.contains(&y) {
                     cell.contents = CellContents::Obstacle {
                         kind: Obstacle::Normal,
                     };
@@ -55,7 +73,7 @@ impl World {
         }
 
         Self {
-            ants,
+            colony,
             width,
             height,
             grid,
@@ -65,7 +83,7 @@ impl World {
 
     pub fn update(&mut self, dt: f32) {
         self.current_dt = dt;
-        for ant in &mut self.ants {
+        for ant in &mut self.colony.ants {
             ant.update(dt, &mut self.grid);
         }
     }
@@ -80,6 +98,15 @@ impl World {
                 };
 
                 match &mut cell.contents {
+                    CellContents::Colony => {
+                        d.draw_rectangle(
+                            x * cell_size,
+                            y * cell_size,
+                            cell_size,
+                            cell_size,
+                            Color::ORANGERED,
+                        );
+                    }
                     CellContents::Empty => {
                         d.draw_rectangle(
                             x * cell_size,
@@ -115,7 +142,7 @@ impl World {
                             d.draw_circle(
                                 x * self.grid.cell_size + 2,
                                 y * self.grid.cell_size + 2,
-                                0.99999,
+                                CELL_SIZE as f32 / 3.0,
                                 color,
                             );
                         }
@@ -142,7 +169,7 @@ impl World {
             }
         }
 
-        for ant in &self.ants {
+        for ant in &self.colony.ants {
             ant.draw(d);
         }
     }
@@ -180,10 +207,6 @@ where
             cell_size,
             cells,
         }
-    }
-
-    pub fn cells_mut(&mut self) -> &mut Vec<Cell<T>> {
-        &mut self.cells
     }
 
     pub fn get(&self, x: i32, y: i32) -> Option<&Cell<T>> {
