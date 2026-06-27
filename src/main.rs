@@ -39,16 +39,3 @@ fn main() {
         world.draw(&mut d);
     }
 }
-
-pub fn grid_to_pixel(grid_x: i32, grid_y: i32, cell_size: i32, get_center: bool) -> Vector2 {
-    let mut pixel_x = (grid_x * cell_size) as f32;
-    let mut pixel_y = (grid_y * cell_size) as f32;
-
-    if get_center {
-        let half_cell = cell_size as f32 / 2.0;
-        pixel_x += half_cell;
-        pixel_y += half_cell;
-    }
-
-    Vector2::new(pixel_x, pixel_y)
-}

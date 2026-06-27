@@ -1,4 +1,5 @@
 use crate::*;
+use rand::RngExt as _;
 
 pub struct World {
     pub width: i32,
@@ -11,6 +12,7 @@ pub struct World {
 impl World {
     pub fn new(width: i32, height: i32, cell_size: i32, colony: AntColony) -> Self {
         let mut grid = Grid::new(width, height, cell_size);
+        let mut rng = rand::rng();
 
         // Calculate number of cells per width & height pixels
         let w = width / cell_size;
@@ -54,6 +56,20 @@ impl World {
                     cell.contents = contents;
                     continue;
                 }
+
+                // Randomly sprinkle food
+                let rand_x = rng.random_range(0..=w);
+                let rand_y = rng.random_range(0..=h);
+                let rand_x_range = (rand_x - 10).max(0)..(rand_x + 10).min(w);
+                let rand_y_range = (rand_y - 10).max(0)..(rand_y + 10).min(h);
+
+                if rand_x_range.contains(&x) && rand_y_range.contains(&y) {
+                    let food = Food::default();
+                    let terrain = Terrain::Food(food);
+                    let contents = CellContents::new(terrain);
+                    cell.contents = contents;
+                    continue;
+                }
             }
         }
 
@@ -80,11 +96,9 @@ impl World {
     pub fn draw(&mut self, d: &mut RaylibDrawHandle) {
         let cell_size = self.grid.cell_size;
 
-        for (index, cell) in &mut self.grid.cells.iter().enumerate() {
-            let (x, y) = self
-                .grid
-                .coords_from_index(index)
-                .expect("if we have an out of bounds index here something went wrong");
+        for cell in &mut self.grid.cells {
+            let x = cell.x;
+            let y = cell.y;
 
             match cell.contents.terrain {
                 Terrain::Obstacle { kind } => {
@@ -97,6 +111,16 @@ impl World {
                             OBSTACLE_COLOR,
                         );
                     }
+                }
+                Terrain::Food(f) => {
+                    let color = if f.is_harvested {
+                        cell.contents.terrain = Terrain::Empty;
+                        BACKGROUND_COLOR
+                    } else {
+                        Color::GOLD
+                    };
+
+                    d.draw_rectangle(x * cell_size, y * cell_size, cell_size, cell_size, color);
                 }
                 _ => {
                     // Draw standard empty background
@@ -145,92 +169,6 @@ impl World {
         // SECOND : Draw colony
         self.colony.draw(d);
     }
-
-    /*
-    pub fn draw_og(&mut self, d: &mut RaylibDrawHandle) {
-        // Grid layer processing
-        let cell_size = self.grid.cell_size;
-
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let Some(cell) = self.grid.get_mut(x, y) else {
-                    continue;
-                };
-
-                match &mut cell.contents {
-                    CellContents::Empty => {
-                        d.draw_rectangle(
-                            x * cell_size,
-                            y * cell_size,
-                            cell_size,
-                            cell_size,
-                            BACKGROUND_COLOR,
-                        );
-                    }
-                    CellContents::Pheromone {
-                        kind,
-                        strength: lifetime,
-                    } => {
-                        *lifetime = (*lifetime - self.current_dt).max(0.0);
-
-                        if *lifetime <= 0.0 {
-                            cell.contents = CellContents::Empty;
-                            continue;
-                        }
-
-                        if SHOW_PHEROMONES {
-                            let mut color = match kind {
-                                Pheromone::Searching => PHEROMONE_FORAGING_COLOR,
-                                Pheromone::ToHome => PHEROMONE_RETURNING_FOOD_COLOR,
-                                Pheromone::ToFood => unimplemented!(),
-                            };
-
-                            debug_assert!(*lifetime >= 0.0);
-
-                            let alpha_percentage = *lifetime / PHEROMONE_MAX_LIFETIME_SECONDS;
-                            color.a = (alpha_percentage * MAX_RGBA_VALUE as f32) as u8;
-
-                            d.draw_circle(
-                                x * self.grid.cell_size + 2,
-                                y * self.grid.cell_size + 2,
-                                CELL_SIZE as f32 / 3.0,
-                                color,
-                            );
-                        }
-                    }
-                    CellContents::Obstacle { kind } => {
-                        let should_draw = if matches!(kind, Obstacle::Border) {
-                            SHOW_BORDER
-                        } else {
-                            true
-                        };
-
-                        if should_draw {
-                            d.draw_rectangle(
-                                x * cell_size,
-                                y * cell_size,
-                                cell_size,
-                                cell_size,
-                                OBSTACLE_COLOR,
-                            );
-                        }
-                    }
-                    CellContents::Food(_food) => unimplemented!(),
-                };
-            }
-        }
-
-        /* Environment layer processing */
-        /* DRAWING ORDER IS IMPORTANT HERE! */
-
-        // FIRST : Draw ants
-        for ant in &self.colony.ants {
-            ant.draw(d);
-        }
-        // SECOND : Draw colony
-        self.colony.draw(d);
-    }
-    */
 }
 
 /* ------------------------------------------------------------------------------ */
@@ -256,8 +194,16 @@ where
         let width = width / cell_size;
         let height = height / cell_size;
         let size = (width * height) as usize;
+
         let mut cells = Vec::with_capacity(size);
-        cells.resize_with(size, Cell::default);
+
+        for y in 0..height {
+            for x in 0..width {
+                // Pass coordinates straight into your updated cell constructor
+                let cell = Cell::new_with_coords(T::default(), x, y);
+                cells.push(cell);
+            }
+        }
 
         Self {
             width,
@@ -282,15 +228,53 @@ where
         Some(&mut self.cells[i])
     }
 
+    pub fn get_from_position(&self, position: Vector2) -> Option<&Cell<T>> {
+        let (x, y) = self.position_to_grid_coords(position);
+        if !self.is_in_bounds(x, y) {
+            return None;
+        }
+        Some(&self.cells[self.index(x, y)])
+    }
+
+    pub fn get_from_position_mut(&mut self, position: Vector2) -> Option<&mut Cell<T>> {
+        let (x, y) = self.position_to_grid_coords(position);
+        if !self.is_in_bounds(x, y) {
+            return None;
+        }
+        let i = self.index(x, y);
+        Some(&mut self.cells[i])
+    }
+
     pub fn coords_from_index(&self, index: usize) -> Option<(i32, i32)> {
         if index >= self.cells.len() {
             return None;
         }
-
         let x = (index as i32) % self.width;
         let y = (index as i32) / self.width;
-
         Some((x, y))
+    }
+
+    // Takes grid coords and turns them into pixel position
+    pub fn grid_coords_to_position(&self, x: i32, y: i32, get_center: bool) -> Vector2 {
+        let cell_size = self.cell_size;
+        let mut pixel_x = (x * cell_size) as f32;
+        let mut pixel_y = (y * cell_size) as f32;
+
+        if get_center {
+            let half_cell = cell_size as f32 / 2.0;
+            pixel_x += half_cell;
+            pixel_y += half_cell;
+        }
+
+        Vector2::new(pixel_x, pixel_y)
+    }
+
+    // Takes pixel position and turns them into grid coords
+    // return is `(x: i32, y: i32)`
+    pub fn position_to_grid_coords(&self, position: Vector2) -> (i32, i32) {
+        let x = (position.x / self.cell_size as f32).floor() as i32;
+        let y = (position.y / self.cell_size as f32).floor() as i32;
+        (x, y)
     }
 
     fn index(&self, x: i32, y: i32) -> usize {
@@ -312,6 +296,8 @@ where
     T: Default,
 {
     pub contents: T,
+    pub x: i32,
+    pub y: i32,
 }
 
 impl<T> Cell<T>
@@ -319,6 +305,16 @@ where
     T: Default,
 {
     pub fn new(contents: T) -> Self {
-        Self { contents }
+        Self {
+            contents,
+            ..Self::default()
+        }
+    }
+
+    pub fn new_with_coords(contents: T, x: i32, y: i32) -> Self {
+        let mut this = Self::new(contents);
+        this.x = x;
+        this.y = y;
+        this
     }
 }

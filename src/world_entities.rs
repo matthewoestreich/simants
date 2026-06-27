@@ -3,14 +3,7 @@ pub struct Food {
     pub pos_x: i32,
     pub pos_y: i32,
     pub amount: i32,
-}
-
-#[derive(Default, Debug, Clone, Copy)]
-pub enum Pheromone {
-    #[default]
-    Searching,
-    ToFood,
-    ToHome,
+    pub is_harvested: bool,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -24,11 +17,10 @@ pub enum Obstacle {
 pub enum Terrain {
     #[default]
     Empty,
-    Colony,
+    Food(Food),
     Obstacle {
         kind: Obstacle,
     },
-    Food,
 }
 
 #[derive(Default, Debug, Clone, Copy)]

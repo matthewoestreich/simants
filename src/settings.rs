@@ -6,7 +6,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 7000;
+pub const NUM_ANTS: usize = 50;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
 pub const ANT_SIZE_MULTIPLIER: i32 = 3;
 // Pixels per second
@@ -53,7 +53,7 @@ pub const MAX_RGBA_VALUE: u8 = 255;
 
 pub const BACKGROUND_COLOR: Color = Color::BLACK;
 pub const ANT_FORAGING_COLOR: Color = Color::LIMEGREEN;
-pub const ANT_RETURNING_FOOD_COLOR: Color = Color::YELLOW;
+pub const ANT_RETURNING_FOOD_COLOR: Color = Color::ROYALBLUE;
 pub const PHEROMONE_FORAGING_COLOR: Color = Color::DARKGRAY;
 pub const PHEROMONE_RETURNING_FOOD_COLOR: Color = Color::ROYALBLUE;
 pub const OBSTACLE_COLOR: Color = Color::DARKMAGENTA;
