@@ -41,6 +41,34 @@ impl Grid {
         }
     }
 
+    pub fn get_sensed_food_position(
+        &self,
+        left_smell: Option<&Cell>,
+        center_smell: Option<&Cell>,
+        right_smell: Option<&Cell>,
+    ) -> Option<Vector2> {
+        [left_smell, center_smell, right_smell]
+            .into_iter()
+            .flatten()
+            .find(|cell| cell.is_food())
+            .and_then(|cell| self.grid_coords_to_screen(cell.x, cell.y))
+    }
+
+    pub fn get_sensed_colony_position(
+        &self,
+        left_smell: Option<&Cell>,
+        center_smell: Option<&Cell>,
+        right_smell: Option<&Cell>,
+        colony_radius: f32,
+        colony_position: Vector2,
+    ) -> Option<Vector2> {
+        [left_smell, center_smell, right_smell]
+            .into_iter()
+            .flatten()
+            .filter_map(|cell| self.grid_coords_to_screen(cell.x, cell.y))
+            .find(|position| position.distance_sqr(colony_position) < colony_radius)
+    }
+
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Cell> {
         self.cells.iter_mut()
     }
@@ -76,12 +104,26 @@ impl Grid {
         (x, y)
     }
 
-    fn get_grid_index_from_coords(&self, x: u32, y: u32) -> usize {
-        (y * self.width + x) as usize
+    pub fn grid_coords_to_screen(&self, x: u32, y: u32) -> Option<Vector2> {
+        if !self.is_within_grid_bounds(x, y) {
+            return None;
+        }
+
+        let cell_size = self.cell_size as f32;
+        let half_cell = cell_size / 2.0;
+
+        Some(Vector2::new(
+            x as f32 * cell_size + half_cell,
+            y as f32 * cell_size + half_cell,
+        ))
     }
 
-    fn is_within_grid_bounds(&self, x: u32, y: u32) -> bool {
+    pub fn is_within_grid_bounds(&self, x: u32, y: u32) -> bool {
         x < self.width && y < self.height
+    }
+
+    fn get_grid_index_from_coords(&self, x: u32, y: u32) -> usize {
+        (y * self.width + x) as usize
     }
 }
 
@@ -89,7 +131,7 @@ impl Grid {
 /* ---------------- Cell -------------------------------------------------------- */
 /* ------------------------------------------------------------------------------ */
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Cell {
     pub terrain: Terrain,
     pub to_food: Pheromone,
@@ -109,6 +151,10 @@ impl Cell {
             y,
             ..Self::default()
         }
+    }
+
+    pub fn is_food(&self) -> bool {
+        matches!(self.terrain, Terrain::Food(_))
     }
 
     fn terrain_allows_pheromone(&self) -> bool {

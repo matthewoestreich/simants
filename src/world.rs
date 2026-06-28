@@ -1,5 +1,4 @@
 use crate::*;
-use rand::RngExt as _;
 
 pub struct World {
     pub width: i32,
@@ -8,7 +7,6 @@ pub struct World {
     pub screen_offset_y: i32,
     pub colony: AntColony,
     grid: Grid,
-    current_dt: f32,
 }
 
 impl World {
@@ -80,20 +78,17 @@ impl World {
             colony,
             screen_offset_x,
             screen_offset_y,
-            current_dt: 0.0,
         }
     }
 
     pub fn update(&mut self, dt: f32) {
-        self.current_dt = dt;
-
         for cell in self.grid.iter_mut() {
             // Pheromone time decay/evaporation
             cell.to_home.weaken(dt);
             cell.to_food.weaken(dt);
         }
 
-        for ant in &mut self.colony.ants {
+        for ant in self.colony.ants.iter_mut() {
             ant.handle_pause(dt);
 
             if !ant.has_energy() || ant.is_paused() {
@@ -102,15 +97,68 @@ impl World {
 
             ant.update_sensor_positions();
 
-            let sensors = ant.get_sensors();
             // Get readings from our sensors posittions.
-            let left_reading = self.grid.get_cell_mut_from_position(sensors.left);
-            let center_reading = self.grid.get_cell_mut_from_position(sensors.center);
-            let right_reading = self.grid.get_cell_mut_from_position(sensors.right);
+            let left_reading = self
+                .grid
+                .get_cell_from_position(*ant.get_sensor(SensorPosition::Left));
+            let center_reading = self
+                .grid
+                .get_cell_from_position(*ant.get_sensor(SensorPosition::Center));
+            let right_reading = self
+                .grid
+                .get_cell_from_position(*ant.get_sensor(SensorPosition::Right));
+
+            let steering_angle = if ant.is_foraging()
+                && let Some(target) =
+                    self.grid
+                        .get_sensed_food_position(left_reading, center_reading, right_reading)
+            {
+                steer_towards(ant, target)
+            } else if ant.is_returning_food()
+                && let Some(target) = self.grid.get_sensed_colony_position(
+                    left_reading,
+                    center_reading,
+                    right_reading,
+                    self.colony.radius * self.colony.radius,
+                    self.colony.position,
+                )
+            {
+                steer_towards(ant, target)
+            } else if let Some(angle) =
+                handle_pharomone_steering(ant.state, left_reading, center_reading, right_reading)
+            {
+                angle
+            } else {
+                // WANDER RANDOMLY
+                ant.random_wander()
+            };
+
+            // TODO : Place pheromone, if we can
+
+            let desired_velocity = ant.velocity.rotate(steering_angle).normalize() * ANT_MAX_SPEED;
+            let steering_force = desired_velocity - ant.velocity;
+
+            ant.steering_force = steering_force.scale(ANT_MAX_TURN_FORCE * dt);
+            ant.velocity += ant.steering_force;
+            ant.velocity = ant.velocity.normalize() * ANT_MAX_SPEED;
+
+            let next_position = ant.position + ant.velocity * dt;
+
+            if self.is_position_obstacle(next_position, grid) {
+                ant.turn_around();
+                return;
+            }
+
+            ant.position = next_position;
 
             // TODO : delete this after refactor
             //ant.update(dt, &mut self.cells);
         }
+    }
+
+    pub fn is_colony_position(&self, position: Vector2) -> bool {
+        let colony_radius = self.colony.radius * self.colony.radius;
+        position.distance_sqr(self.colony.position) < colony_radius
     }
 
     pub fn screen_to_grid_coords(&self, position: Vector2) -> Option<(u32, u32)> {
@@ -304,4 +352,61 @@ impl World {
     pub fn get_cell_mut_from_position(&mut self, position: Vector2) -> Option<&mut Cell> {
         self.grid.get_cell_mut_from_position(position)
     }
+}
+
+fn handle_pharomone_steering(
+    ant_state: AntState,
+    left_smell: Option<&Cell>,
+    center_smell: Option<&Cell>,
+    right_smell: Option<&Cell>,
+) -> Option<f32> {
+    let (left_strength, center_strength, right_strength) = match ant_state {
+        AntState::Foraging => (
+            left_smell.map_or(0.0, |s| s.to_food.strength),
+            center_smell.map_or(0.0, |s| s.to_food.strength),
+            right_smell.map_or(0.0, |s| s.to_food.strength),
+        ),
+        AntState::ReturningFood => (
+            left_smell.map_or(0.0, |s| s.to_home.strength),
+            center_smell.map_or(0.0, |s| s.to_home.strength),
+            right_smell.map_or(0.0, |s| s.to_home.strength),
+        ),
+        AntState::NoEnergy | AntState::Paused { .. } => {
+            unreachable!("you removed guard clause didnt you")
+        }
+    };
+
+    if center_strength > left_strength && center_strength > right_strength {
+        Some(0.0f32.to_radians())
+    } else if left_strength > right_strength {
+        Some(-15.0f32.to_radians())
+    } else if right_strength > left_strength {
+        Some(15.0f32.to_radians())
+    } else {
+        None
+    }
+}
+
+fn steer_towards(ant: &Ant, target: Vector2) -> f32 {
+    let to_target = target - ant.position;
+
+    if to_target.length_sqr() <= 0.001 {
+        return 0.0;
+    }
+
+    let current_angle = ant.velocity.y.atan2(ant.velocity.x);
+    let target_angle = to_target.y.atan2(to_target.x);
+
+    let mut angle_diff = target_angle - current_angle;
+
+    while angle_diff > std::f32::consts::PI {
+        angle_diff -= 2.0 * std::f32::consts::PI;
+    }
+    while angle_diff < -std::f32::consts::PI {
+        angle_diff += 2.0 * std::f32::consts::PI;
+    }
+
+    let max_turn_rate = ANT_TURN_ANGLE.to_radians();
+
+    angle_diff.clamp(-max_turn_rate, max_turn_rate)
 }

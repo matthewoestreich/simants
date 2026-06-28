@@ -61,7 +61,7 @@ impl AntColony {
 /* ---------------------------------------------------------------- */
 
 #[derive(Default, Debug, Clone, Copy)]
-pub struct AntSensors {
+pub struct Sensors {
     pub left: Vector2,
     pub center: Vector2,
     pub right: Vector2,
@@ -69,7 +69,7 @@ pub struct AntSensors {
     pub angle: f32,    // Angle that left and right sensors will be at
 }
 
-impl AntSensors {
+impl Sensors {
     pub fn new(sensing_angle: f32, sensing_distance: f32) -> Self {
         Self {
             angle: sensing_angle,
@@ -84,6 +84,12 @@ impl AntSensors {
         self.center = ant_position + forward * self.distance;
         self.right = ant_position + forward.rotate(-self.angle) * self.distance;
     }
+}
+
+pub enum SensorPosition {
+    Left,
+    Center,
+    Right,
 }
 
 /* ---------------------------------------------------------------- */
@@ -102,7 +108,7 @@ pub struct Ant {
 
     // Should really be private
     pub energy: f32,
-    sensors: AntSensors,
+    sensors: Sensors,
     rng: rand::rngs::ThreadRng,
 }
 
@@ -113,9 +119,8 @@ impl Ant {
 
         let velocity =
             Vector2::new(forward_direction.cos(), forward_direction.sin()) * ANT_MAX_SPEED;
+        let mut sensors = Sensors::new(ANT_SENSOR_ANGLE, (CELL_SIZE * ANT_SENSOR_DISTANCE) as f32);
 
-        let mut sensors =
-            AntSensors::new(ANT_SENSOR_ANGLE, (CELL_SIZE * ANT_SENSOR_DISTANCE) as f32);
         sensors.sense(position, velocity);
 
         Self {
@@ -128,12 +133,22 @@ impl Ant {
         }
     }
 
-    pub fn get_sensors(&self) -> &AntSensors {
-        &self.sensors
-    }
-
     pub fn update_sensor_positions(&mut self) {
         self.sensors.sense(self.position, self.velocity);
+    }
+
+    pub fn get_sensor(&self, sensor: SensorPosition) -> &Vector2 {
+        match sensor {
+            SensorPosition::Left => &self.sensors.left,
+            SensorPosition::Center => &self.sensors.center,
+            SensorPosition::Right => &self.sensors.right,
+        }
+    }
+
+    pub fn random_wander(&mut self) -> f32 {
+        self.rng
+            .random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
+            .to_radians()
     }
 
     /*
@@ -324,6 +339,14 @@ impl Ant {
 
     pub fn is_paused(&self) -> bool {
         matches!(self.state, AntState::Paused { .. })
+    }
+
+    pub fn is_foraging(&self) -> bool {
+        matches!(self.state, AntState::Foraging)
+    }
+
+    pub fn is_returning_food(&self) -> bool {
+        matches!(self.state, AntState::ReturningFood)
     }
 
     pub fn has_energy(&self) -> bool {
