@@ -6,7 +6,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 200;
+pub const NUM_ANTS: usize = 7000;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
 pub const ANT_SIZE_MULTIPLIER: u32 = 3;
 // Pixels per second
@@ -56,10 +56,10 @@ pub const TITLE: &str = "Ant Simulation";
 pub const SCREEN_WIDTH: i32 = 1200;
 // If either SCREEN_WIDTH or SCREEN_HEIGHT is <= 0 we use full screen width
 pub const SCREEN_HEIGHT: i32 = 800;
-pub const GRID_WIDTH: u32 = 800;
-pub const GRID_HEIGHT: u32 = 600;
+pub const GRID_WIDTH: u32 = 1200;
+pub const GRID_HEIGHT: u32 = 800;
 // N x N pixels
-pub const CELL_SIZE: u32 = 8;
+pub const CELL_SIZE: u32 = 4;
 pub const MAX_RGBA_VALUE: u8 = 255;
 
 /* ----------------------------------- */
