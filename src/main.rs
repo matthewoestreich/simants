@@ -21,18 +21,40 @@ fn main() {
     }
 
     let (mut rl, thread) = rl_builder.build();
-    let sw = rl.get_screen_width();
-    let sh = rl.get_screen_height();
+
+    let screen_width = rl.get_screen_width();
+    let screen_height = rl.get_screen_height();
+    //let grid_width = screen_width.max(0) as u32 - (40 * CELL_SIZE);
+    //let grid_height = screen_height.max(0) as u32 - (20 * CELL_SIZE);
+    let colony_position_x = GRID_WIDTH as f32 / 4.0;
+    let colony_position_y = GRID_HEIGHT as f32 / 2.0;
 
     let colony = AntColony::new_with_immediate_spawn(
         NUM_ANTS,
         5.0 * CELL_SIZE as f32,
-        Vector2::new(sw as f32 / 4.0, sh as f32 / 3.0),
+        Vector2::new(colony_position_x, colony_position_y),
     );
 
-    let mut world = World::new(sw, sh, CELL_SIZE, colony);
+    let mut world = World::new(
+        screen_width,
+        screen_height,
+        GRID_WIDTH,
+        GRID_HEIGHT,
+        CELL_SIZE,
+        colony,
+    );
 
     while !rl.window_should_close() {
+        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+            let click_position = rl.get_mouse_position();
+
+            if let Some((x, y)) = world.grid.screen_to_grid_coords(click_position)
+                && let Some(cell) = world.grid.get(x, y)
+            {
+                println!("{cell:?}");
+            }
+        }
+
         world.update(rl.get_frame_time());
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
