@@ -6,14 +6,14 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 7000;
+pub const NUM_ANTS: usize = 2000;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
-pub const ANT_SIZE_MULTIPLIER: u32 = 3;
+pub const ANT_SIZE_MULTIPLIER: u32 = 2;
 // Pixels per second
 pub const ANT_MAX_SPEED: f32 = 40.0;
 // How fast can an ant turn. The higher this value, the longer it will take an ant to face a
 // difffernt direction.
-pub const ANT_MAX_TURN_FORCE: f32 = 30.0;
+pub const ANT_MAX_TURN_FORCE: f32 = 15.0;
 // In radians
 pub const ANT_TURN_ANGLE: f32 = 25.0; //pub const ANT_TURN_ANGLE_RANGE: Range<f32> = -25.0..25.0;
 // When an ant is at an obstacle, we furst flip the current direction it is facingg, so we need to
@@ -25,7 +25,7 @@ pub const ANT_PAUSE_PROBABILITY: f64 = 0.00019;
 // We choose a random number in this range and have the ant pause for that many seconds
 pub const ANT_PAUSE_FOR_RANGE_IN_SEC: Range<f32> = 0.5..1.2;
 // The longer an ant walks, the weaker the pheromones it drops are.
-pub const ANT_PHEROMONE_STRENGTH_DECAY: f32 = 0.05;
+pub const ANT_PHEROMONE_STRENGTH_DECAY: f32 = 0.5;
 // Ants have 3 sensors that can 'read' what is in front of them.
 // One directly ahead at some distance, another at some angle to the right of the one directly ahead,
 // and one at the negative value of said angle to the left of the one directly ahead.
@@ -42,7 +42,7 @@ pub const PHEROMONE_MAX_LIFETIME_SECONDS: f32 = 60.0;
 /* ------- Hide/Show Entities -------- */
 /* ----------------------------------- */
 
-pub const SHOW_BORDER: bool = true;
+pub const SHOW_BORDER: bool = false;
 pub const SHOW_PHEROMONES: bool = true;
 pub const SHOW_ANT_SENSORS: bool = false;
 pub const SHOW_GRID_LINES: bool = false;
@@ -59,7 +59,7 @@ pub const SCREEN_HEIGHT: i32 = 800;
 pub const GRID_WIDTH: u32 = 1200;
 pub const GRID_HEIGHT: u32 = 800;
 // N x N pixels
-pub const CELL_SIZE: u32 = 4;
+pub const CELL_SIZE: u32 = 8;
 pub const MAX_RGBA_VALUE: u8 = 255;
 
 /* ----------------------------------- */
