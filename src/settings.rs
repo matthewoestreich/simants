@@ -8,7 +8,7 @@ use std::ops::Range;
 // How many ants to initially render
 pub const NUM_ANTS: usize = 200;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
-pub const ANT_SIZE_MULTIPLIER: u32 = 2;
+pub const ANT_SIZE_MULTIPLIER: u32 = 3;
 // Pixels per second
 pub const ANT_MAX_SPEED: f32 = 40.0;
 // How fast can an ant turn. The higher this value, the longer it will take an ant to face a
@@ -36,7 +36,7 @@ pub const ANT_SENSOR_ANGLE: f32 = 30.0; // In radians
 // This number will be multiplied by the cell size.
 pub const ANT_SENSOR_DISTANCE: u32 = 3;
 // Pheromones slowly evaporate over time.
-pub const PHEROMONE_MAX_LIFETIME_SECONDS: f32 = 120.0;
+pub const PHEROMONE_MAX_LIFETIME_SECONDS: f32 = 60.0;
 
 /* ----------------------------------- */
 /* ------- Hide/Show Entities -------- */
@@ -45,7 +45,7 @@ pub const PHEROMONE_MAX_LIFETIME_SECONDS: f32 = 120.0;
 pub const SHOW_BORDER: bool = true;
 pub const SHOW_PHEROMONES: bool = true;
 pub const SHOW_ANT_SENSORS: bool = false;
-pub const SHOW_GRID_LINES: bool = true;
+pub const SHOW_GRID_LINES: bool = false;
 
 /* ----------------------------------- */
 /* ------- Window/GUI Options -------- */

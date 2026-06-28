@@ -90,7 +90,7 @@ impl World {
     pub fn update(&mut self, dt: f32) {
         self.current_dt = dt;
         for cell in &mut self.grid.cells {
-            cell.contents.foraging_strength = (cell.contents.foraging_strength - dt).max(0.0);
+            cell.contents.to_food_strength = (cell.contents.to_food_strength - dt).max(0.0);
             cell.contents.to_home_strength = (cell.contents.to_home_strength - dt).max(0.0);
         }
         for ant in &mut self.colony.ants {
@@ -153,9 +153,9 @@ impl World {
 
             if SHOW_PHEROMONES {
                 // If there is searching pheromone here, render it
-                if cell.contents.foraging_strength > 0.0 {
-                    let mut color = PHEROMONE_FORAGING_COLOR;
-                    let alpha = cell.contents.foraging_strength / PHEROMONE_MAX_LIFETIME_SECONDS;
+                if cell.contents.to_food_strength > 0.0 {
+                    let mut color = PHEROMONE_RETURNING_FOOD_COLOR;
+                    let alpha = cell.contents.to_food_strength / PHEROMONE_MAX_LIFETIME_SECONDS;
                     color.a = (alpha * MAX_RGBA_VALUE as f32) as u8;
                     d.draw_circle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
@@ -166,13 +166,13 @@ impl World {
                 }
                 // If there is a return trail here, render it
                 if cell.contents.to_home_strength > 0.0 {
-                    let mut color = PHEROMONE_RETURNING_FOOD_COLOR;
+                    let mut color = PHEROMONE_FORAGING_COLOR;
                     let alpha = cell.contents.to_home_strength / PHEROMONE_MAX_LIFETIME_SECONDS;
                     color.a = (alpha * MAX_RGBA_VALUE as f32) as u8;
                     d.draw_circle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
                         screen_offset_y + (y * cell_size + cell_size / 2),
-                        cell_size as f32 / 3.0,
+                        cell_size as f32 / 4.0,
                         color,
                     );
                 }

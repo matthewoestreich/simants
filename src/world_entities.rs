@@ -26,7 +26,7 @@ pub enum Terrain {
 #[derive(Default, Debug, Clone, Copy)]
 pub struct CellContents {
     pub terrain: Terrain,
-    pub foraging_strength: f32,
+    pub to_food_strength: f32,
     pub to_home_strength: f32,
 }
 

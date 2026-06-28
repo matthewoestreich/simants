@@ -125,53 +125,20 @@ impl Ant {
 
         self.sensors = Some((left_sensor_pos, forward_sensor_pos, right_sensor_pos));
 
-        let mut left_reading = self.sample_grid(grid, left_sensor_pos);
+        let left_reading = self.sample_grid(grid, left_sensor_pos);
         let forward_reading = self.sample_grid(grid, forward_sensor_pos);
         let right_reading = self.sample_grid(grid, right_sensor_pos);
 
-        /*
-                let food = match self.state {
-                    AntState::Foraging => {
-                        if let Some(ref mut lr) = left_reading
-                            && let Terrain::Food(ref mut f) = lr.terrain
-                        {
-                            Some(f)
-                        } else if let Some(fr) = forward_reading
-                            && let Terrain::Food(f) = &mut fr.terrain
-                        {
-                            Some(f)
-                        } else if let Some(rr) = right_reading
-                            && let Terrain::Food(f) = &mut rr.terrain
-                        {
-                            Some(f)
-                        } else {
-                            None
-                        }
-                    }
-                    AntState::ReturningFood => None,
-                    AntState::NoEnergy | AntState::Paused { .. } => unreachable!(),
-                };
-
-                if let Some(f) = food {
-                    if self.food.is_none() {
-                        //f.is_harvested = true;
-                        self.food = Some(*f);
-                        self.state = AntState::ReturningFood;
-                        self.energy = 1.0;
-                    }
-                }
-        */
-
         let (left_smell, center_smell, right_smell) = match self.state {
             AntState::Foraging => (
+                left_reading.map_or(0.0, |s| s.to_food_strength),
+                forward_reading.map_or(0.0, |s| s.to_food_strength),
+                right_reading.map_or(0.0, |s| s.to_food_strength),
+            ),
+            AntState::ReturningFood => (
                 left_reading.map_or(0.0, |s| s.to_home_strength),
                 forward_reading.map_or(0.0, |s| s.to_home_strength),
                 right_reading.map_or(0.0, |s| s.to_home_strength),
-            ),
-            AntState::ReturningFood => (
-                left_reading.map_or(0.0, |s| s.foraging_strength),
-                forward_reading.map_or(0.0, |s| s.foraging_strength),
-                right_reading.map_or(0.0, |s| s.foraging_strength),
             ),
             AntState::NoEnergy | AntState::Paused { .. } => {
                 unreachable!("you removed guard clause didnt you")
@@ -252,7 +219,6 @@ impl Ant {
 
     fn can_place_pheromone(&self) -> bool {
         matches!(self.state, AntState::Foraging | AntState::ReturningFood)
-            && !self.is_within_colony()
     }
 
     // Try to place a pheromone at current position.
@@ -270,15 +236,15 @@ impl Ant {
             match self.state {
                 AntState::Foraging => {
                     // Only overwrite if pheromone strength is stronger than what exists
-                    if pheromone_strength > cell.contents.foraging_strength {
-                        cell.contents.foraging_strength = pheromone_strength;
+                    if pheromone_strength > cell.contents.to_home_strength {
+                        cell.contents.to_home_strength = pheromone_strength;
                         self.energy = (self.energy - energy_loss_amount).max(0.0);
                     }
                 }
                 AntState::ReturningFood => {
                     // Only overwrite if pheromone strength is stronger than what exists
-                    if pheromone_strength > cell.contents.to_home_strength {
-                        cell.contents.to_home_strength = pheromone_strength;
+                    if pheromone_strength > cell.contents.to_food_strength {
+                        cell.contents.to_food_strength = pheromone_strength;
                         self.energy = (self.energy - energy_loss_amount).max(0.0);
                     }
                 }
@@ -292,16 +258,6 @@ impl Ant {
         grid.get_from_position(position + self.velocity.normalize())
             .map(|cell| matches!(cell.contents.terrain, Terrain::Obstacle { .. }))
             .unwrap_or(true)
-    }
-
-    pub fn is_within_colony(&self) -> bool {
-        debug_assert!(self.colony_radius.is_some());
-        if let Some(colony_radius) = self.colony_radius {
-            let distance_squared = self.position.distance_sqr(self.colony_center);
-            let radius_squared = colony_radius * colony_radius;
-            return distance_squared <= radius_squared;
-        }
-        false
     }
 
     pub fn sensed_colony(&self) -> bool {
@@ -401,7 +357,7 @@ impl Ant {
             // Foraging ants are looking for food paths or tracking home back paths
             AntState::Foraging => cell.contents.to_home_strength,
             // Ants heading home look for trails left by searchers leading outward
-            AntState::ReturningFood => cell.contents.foraging_strength,
+            AntState::ReturningFood => cell.contents.to_food_strength,
             _ => 0.0,
         }
     }
