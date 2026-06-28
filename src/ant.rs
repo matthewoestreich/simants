@@ -1,4 +1,4 @@
-use crate::{world::Grid, *};
+use crate::*;
 use rand::RngExt as _;
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -42,9 +42,7 @@ impl AntColony {
 
     pub fn spawn_ants(&mut self) {
         for i in 0..self.num_ants {
-            let mut ant = Ant::new(self.position);
-            ant.colony_radius = Some(self.radius);
-            self.ants.insert(i, ant);
+            self.ants.insert(i, Ant::new(self.position));
         }
     }
 
@@ -59,6 +57,36 @@ impl AntColony {
 }
 
 /* ---------------------------------------------------------------- */
+/* -------------- AntSensors -------------------------------------- */
+/* ---------------------------------------------------------------- */
+
+#[derive(Default, Debug, Clone, Copy)]
+pub struct AntSensors {
+    pub left: Vector2,
+    pub center: Vector2,
+    pub right: Vector2,
+    pub distance: f32, // In pixels
+    pub angle: f32,    // Angle that left and right sensors will be at
+}
+
+impl AntSensors {
+    pub fn new(sensing_angle: f32, sensing_distance: f32) -> Self {
+        Self {
+            angle: sensing_angle,
+            distance: sensing_distance,
+            ..Self::default()
+        }
+    }
+
+    pub fn sense(&mut self, ant_position: Vector2, ant_velocity: Vector2) {
+        let forward = ant_velocity.normalize();
+        self.left = ant_position + forward.rotate(self.angle) * self.distance;
+        self.center = ant_position + forward * self.distance;
+        self.right = ant_position + forward.rotate(-self.angle) * self.distance;
+    }
+}
+
+/* ---------------------------------------------------------------- */
 /* -------------- Ant --------------------------------------------- */
 /* ---------------------------------------------------------------- */
 
@@ -66,15 +94,15 @@ impl AntColony {
 pub struct Ant {
     pub id: i32,
     pub position: Vector2,
-    pub energy: f32,
     pub velocity: Vector2,
-    pub colony_center: Vector2,
-    pub colony_radius: Option<f32>,
     pub state: AntState,
     pub state_before_pause: Option<AntState>,
     pub steering_force: Vector2,
     pub food: Option<Food>,
-    pub sensors: Option<(Vector2, Vector2, Vector2)>,
+
+    // Should really be private
+    pub energy: f32,
+    sensors: AntSensors,
     rng: rand::rngs::ThreadRng,
 }
 
@@ -83,18 +111,65 @@ impl Ant {
         let mut rng = rand::rng();
         let forward_direction = rng.random_range(0.0f32..360.0f32).to_radians();
 
+        let velocity =
+            Vector2::new(forward_direction.cos(), forward_direction.sin()) * ANT_MAX_SPEED;
+
+        let mut sensors =
+            AntSensors::new(ANT_SENSOR_ANGLE, (CELL_SIZE * ANT_SENSOR_DISTANCE) as f32);
+        sensors.sense(position, velocity);
+
         Self {
             position,
             rng,
-            colony_center: position,
             energy: 1.0,
-            velocity: Vector2::new(forward_direction.cos(), forward_direction.sin())
-                * ANT_MAX_SPEED,
+            velocity,
+            sensors,
             ..Self::default()
         }
     }
 
-    pub fn update(&mut self, dt: f32, grid: &mut Grid<CellContents>) {
+    pub fn get_sensors(&self) -> &AntSensors {
+        &self.sensors
+    }
+
+    pub fn update_sensor_positions(&mut self) {
+        self.sensors.sense(self.position, self.velocity);
+    }
+
+    /*
+    impl Ant {
+        /// Returns the steering angle rotation (in radians) needed to smoothly turn toward a position.
+        /// You can pass the output of this method directly into your `self.velocity.rotate()` logic.
+        pub fn steer_towards(&self, target: Vector2) -> f32 {
+            let to_target = target - self.position;
+
+            // Safety check to avoid division-by-zero errors if the ant is exactly on the target
+            if to_target.length_sqr() <= 0.001 {
+                return 0.0;
+            }
+
+            // 1. Calculate the absolute angle directions of both vectors
+            let current_angle = self.velocity.y.atan2(self.velocity.x);
+            let target_angle = to_target.y.atan2(to_target.x);
+
+            // 2. Find the delta difference between the two angles
+            let mut angle_diff = target_angle - current_angle;
+
+            // 3. Normalize the angle difference between -PI and +PI
+            // This forces the ant to always turn along the shortest path (left vs right)
+            while angle_diff > std::f32::consts::PI { angle_diff -= 2.0 * std::f32::consts::PI; }
+            while angle_diff < -std::f32::consts::PI { angle_diff += 2.0 * std::f32::consts::PI; }
+
+            // 4. Clamp the turn angle by your ant's organic maximum turning rate
+            // (Assuming ANT_TURN_ANGLE is a float in degrees, like 15.0)
+            let max_turn_rate = ANT_TURN_ANGLE.to_radians();
+
+            angle_diff.clamp(-max_turn_rate, max_turn_rate)
+        }
+    }
+        */
+
+    pub fn update(&mut self, dt: f32, grid: &mut Grid) {
         if self.energy <= 0.0 {
             self.state = AntState::NoEnergy;
             return;
@@ -112,7 +187,7 @@ impl Ant {
             return;
         }
 
-        let sensor_distance = (grid.cell_size * ANT_SENSOR_DISTANCE) as f32;
+        let sensor_distance = (CELL_SIZE * ANT_SENSOR_DISTANCE) as f32;
 
         // Rotate forward heading vector to find antenna paths
         let forward = self.velocity.normalize();
@@ -181,8 +256,82 @@ impl Ant {
         self.position = next_position;
     }
 
+    pub fn handle_pheromone_steering(&mut self) -> f32 {
+        let (left_smell, center_smell, right_smell) = match self.state {
+            AntState::Foraging => (
+                left_reading.map_or(0.0, |s| s.to_food_strength),
+                forward_reading.map_or(0.0, |s| s.to_food_strength),
+                right_reading.map_or(0.0, |s| s.to_food_strength),
+            ),
+            AntState::ReturningFood => (
+                left_reading.map_or(0.0, |s| s.to_home_strength),
+                forward_reading.map_or(0.0, |s| s.to_home_strength),
+                right_reading.map_or(0.0, |s| s.to_home_strength),
+            ),
+            AntState::NoEnergy | AntState::Paused { .. } => {
+                unreachable!("you removed guard clause didnt you")
+            }
+        };
+
+        let steering_angle = if center_smell > left_smell && center_smell > right_smell {
+            0.0f32.to_radians()
+        } else if left_smell > right_smell {
+            -15.0f32.to_radians()
+        } else if right_smell > left_smell {
+            15.0f32.to_radians()
+        } else {
+            // No pheromone found: fall back to a random search walk
+            self.rng
+                .random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
+                .to_radians()
+        };
+
+        steering_angle
+    }
+
+    pub fn handle_pause(&mut self, decrease_pause_time_by: f32) {
+        if let AntState::Paused { ref mut remaining } = self.state {
+            self.energy += 0.001;
+            *remaining -= decrease_pause_time_by;
+            if *remaining <= 0.0 {
+                self.state = self
+                    .state_before_pause
+                    .expect("this should never be None when coming out of a pause");
+                self.state_before_pause = None;
+            }
+        }
+        if self.should_pause(ANT_PAUSE_PROBABILITY) {
+            self.state_before_pause = Some(self.state);
+            self.state = AntState::Paused {
+                remaining: self.rng.random_range(ANT_PAUSE_FOR_RANGE_IN_SEC),
+            };
+        }
+    }
+
+    pub fn lose_energy(&mut self, value: f32) {
+        self.energy -= value;
+        if self.energy <= 0.0 {
+            self.state = AntState::NoEnergy;
+        }
+    }
+
+    pub fn gain_energy(&mut self, value: f32) {
+        self.energy += value;
+        if self.energy > 0.0 && matches!(self.state, AntState::NoEnergy) {
+            self.state = AntState::Foraging;
+        }
+    }
+
+    pub fn is_paused(&self) -> bool {
+        matches!(self.state, AntState::Paused { .. })
+    }
+
+    pub fn has_energy(&self) -> bool {
+        self.energy > 0.0 || !matches!(self.state, AntState::NoEnergy)
+    }
+
     // Returns true if we are already paused or need to pause
-    fn is_paused(&mut self, dt: f32) -> bool {
+    fn is_paused_og(&mut self, dt: f32) -> bool {
         if let AntState::Paused { ref mut remaining } = self.state {
             self.energy += 0.001;
             *remaining -= dt;
@@ -213,45 +362,26 @@ impl Ant {
         self.velocity = self.velocity.rotate(panic_angle);
     }
 
-    fn terrain_allows_pheromone(&self, terrain: Terrain) -> bool {
-        !matches!(terrain, Terrain::Obstacle { .. } | Terrain::Food(_))
-    }
-
-    fn can_place_pheromone(&self) -> bool {
-        matches!(self.state, AntState::Foraging | AntState::ReturningFood)
-    }
-
-    // Try to place a pheromone at current position.
-    // If we were able to place a pheromone, we subtract specified energy loss amount from ants energy.
-    pub fn try_place_pheromone(&mut self, grid: &mut Grid<CellContents>, energy_loss_amount: f32) {
-        if !self.can_place_pheromone() {
-            return;
-        }
-
-        if let Some(cell) = grid.get_mut_from_position(self.position)
-            && self.terrain_allows_pheromone(cell.contents.terrain)
-        {
-            let pheromone_strength = PHEROMONE_MAX_LIFETIME_SECONDS * self.energy;
-
-            match self.state {
-                AntState::Foraging => {
-                    // Only overwrite if pheromone strength is stronger than what exists
-                    if pheromone_strength > cell.contents.to_home_strength {
-                        cell.contents.to_home_strength = pheromone_strength;
-                        self.energy = (self.energy - energy_loss_amount).max(0.0);
-                    }
+    pub fn produce_pheromone_if_stronger(&mut self, other_strength: f32) -> Option<Pheromone> {
+        match self.state {
+            AntState::Foraging => {
+                let strength = PHEROMONE_MAX_LIFETIME_SECONDS * self.energy;
+                if strength > other_strength {
+                    Some(Pheromone::new(PheromoneKind::ToHome, strength))
+                } else {
+                    None
                 }
-                AntState::ReturningFood => {
-                    // Only overwrite if pheromone strength is stronger than what exists
-                    if pheromone_strength > cell.contents.to_food_strength {
-                        cell.contents.to_food_strength = pheromone_strength;
-                        self.energy = (self.energy - energy_loss_amount).max(0.0);
-                    }
-                }
-                AntState::NoEnergy => unreachable!("you removed the guard clause didnt you"),
-                AntState::Paused { .. } => unreachable!(),
             }
-        };
+            AntState::ReturningFood => {
+                let strength = PHEROMONE_MAX_LIFETIME_SECONDS * self.energy;
+                if strength > other_strength {
+                    Some(Pheromone::new(PheromoneKind::ToFood, strength))
+                } else {
+                    None
+                }
+            }
+            AntState::NoEnergy | AntState::Paused { .. } => None,
+        }
     }
 
     pub fn is_position_obstacle(&mut self, position: Vector2, grid: &Grid<CellContents>) -> bool {

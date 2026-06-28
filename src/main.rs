@@ -1,12 +1,14 @@
 mod ant;
+mod entities;
+mod grid;
 mod settings;
 mod world;
-mod world_entities;
 
 pub(crate) use ant::*;
+pub(crate) use entities::*;
+pub(crate) use grid::*;
 pub(crate) use raylib::prelude::*;
 pub(crate) use settings::*;
-pub(crate) use world_entities::*;
 
 use crate::world::World;
 
@@ -48,8 +50,8 @@ fn main() {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             let click_position = rl.get_mouse_position();
 
-            if let Some((x, y)) = world.grid.screen_to_grid_coords(click_position)
-                && let Some(cell) = world.grid.get(x, y)
+            if let Some((x, y)) = world.screen_to_grid_coords(click_position)
+                && let Some(cell) = world.get_cell(x, y)
             {
                 println!("{cell:?}");
             }
