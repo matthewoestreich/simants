@@ -207,7 +207,9 @@ impl Ant {
             return;
         }
 
-        self.pick_up_food_from_position(next_position, grid);
+        if self.pick_up_food_from_position(next_position, grid) {
+            self.turn_around();
+        }
 
         self.position = next_position;
     }
