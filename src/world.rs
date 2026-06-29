@@ -100,8 +100,8 @@ impl World {
     pub fn update(&mut self, delta_time: f32) {
         for cell in self.grid.iter_mut() {
             // Pheromone time decay/evaporation
-            cell.to_home.weaken(delta_time);
-            cell.to_food.weaken(delta_time);
+            cell.to_home.weaken(PHEROMONE_EVAPORATION_DECAY_PER_FRAME);
+            cell.to_food.weaken(PHEROMONE_EVAPORATION_DECAY_PER_FRAME);
         }
 
         for ant in self.colony.ants.iter_mut() {
@@ -229,8 +229,10 @@ impl World {
                 // If there is searching pheromone here, render it
                 if cell.to_home.strength() > 0.0 {
                     let mut color = PHEROMONE_FORAGING_COLOR;
-                    let alpha = cell.to_home.strength() / ANT_PHEROMONE_STRENGTH_DECAY;
-                    color.a = (alpha * MAX_RGBA_VALUE as f32) as u8;
+                    let alpha = ((cell.to_home.strength() / ANT_PHEROMONE_STRENGTH_DECAY)
+                        * (MAX_RGBA_VALUE as f32))
+                        .min(MAX_RGBA_VALUE as f32);
+                    color.a = alpha as u8;
                     d.draw_circle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
                         screen_offset_y + (y * cell_size + cell_size / 2),

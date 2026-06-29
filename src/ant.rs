@@ -149,10 +149,8 @@ impl Ant {
             // If we hit an obstruction, turn around.
             if sensor_reading.current.terrain.is_obstruction() {
                 self.velocity *= -1.0;
-                // Return our "panic angle"
-                self.rng
-                    .random_range(ANT_OBSTACLE_PANIC_ANGLE_RANGE)
-                    .to_radians()
+                // Get angle that lets us turn around behind us anywher within 90 deg
+                self.get_turn_around_angle()
             }
             // If we are looking for food and sensed food, steer towards it
             else if self.is_foraging() && self.has_sensed(Terrain::Food, sensor_reading) {
@@ -331,13 +329,22 @@ impl Ant {
         }
     }
 
+    fn get_turn_around_angle(&mut self) -> f32 {
+        let half_wedge = 90.0f32.to_radians();
+        self.rng.random_range(-half_wedge..=half_wedge)
+    }
+
     pub fn turn_around(&mut self) {
         self.velocity *= -1.0;
-        let panic_angle = self
-            .rng
-            .random_range(ANT_OBSTACLE_PANIC_ANGLE_RANGE)
-            .to_radians();
-        self.velocity = self.velocity.rotate(panic_angle);
+        self.velocity = self.velocity.rotate(self.get_turn_around_angle());
+
+        // ORIGINAL
+
+        //let panic_angle = self
+        //    .rng
+        //    .random_range(ANT_OBSTACLE_PANIC_ANGLE_RANGE)
+        //    .to_radians();
+        //self.velocity = self.velocity.rotate(panic_angle);
     }
 
     pub fn can_place_pheromone(&self) -> bool {

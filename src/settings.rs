@@ -6,7 +6,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 1;
+pub const NUM_ANTS: usize = 100;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
 pub const ANT_SIZE_MULTIPLIER: u32 = 2;
 // Pixels per second
@@ -27,7 +27,7 @@ pub const ANT_PAUSE_PROBABILITY: f64 = 0.001;
 // We choose a random number in this range and have the ant pause for that many seconds
 pub const ANT_PAUSE_FOR_RANGE_IN_SEC: Range<f32> = 0.5..1.2;
 // The longer an ant walks, the weaker the pheromones it drops are.
-pub const ANT_PHEROMONE_STRENGTH_DECAY: f32 = 0.05;
+pub const ANT_PHEROMONE_STRENGTH_DECAY: f32 = 0.005;
 // Ants have 3 sensors that can 'read' what is in front of them.
 // One directly ahead at some distance, another at some angle to the right of the one directly ahead,
 // and one at the negative value of said angle to the left of the one directly ahead.
@@ -37,6 +37,8 @@ pub const ANT_SENSOR_ANGLE: f32 = 30.0; // In radians
 // How far in front of an ant it will read sensors.
 // This number will be multiplied by the cell size.
 pub const ANT_SENSOR_DISTANCE: u32 = 3;
+
+pub const PHEROMONE_EVAPORATION_DECAY_PER_FRAME: f32 = 0.0001;
 
 /* ----------------------------------- */
 /* ------- Hide/Show Entities -------- */
