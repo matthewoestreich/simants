@@ -107,22 +107,10 @@ impl World {
                 continue;
             }
 
-            let current_cell = self
-                .grid
-                .get_cell_mut_from_position(ant.position)
-                .expect("the ant should always be on a valid position, if not we should crash");
+            let sensor_readings = ant.sense_environment(&mut self.grid);
 
-            if current_cell.is_obstacle() || current_cell.is_border() {
-                ant.turn_around();
-                continue;
-            }
-
-            let sensor_readings = ant.sense_environment(&self.grid);
-
-            if current_cell.allows_pheromones() {
-                println!("\nBEFORE\n{ant:?}");
-                ant.place_pheromone(current_cell);
-                println!("AFTER\n{ant:?}\n");
+            if sensor_readings.current.cell.allows_pheromones() {
+                ant.place_pheromone(sensor_readings.current.cell);
             }
 
             if let Some(next_position) = ant.calculate_next_position(&sensor_readings, dt) {
@@ -218,6 +206,7 @@ impl World {
                         BACKGROUND_COLOR,
                     );
                 }
+                Terrain::Invalid => unreachable!("we should never try to draw an invalid cell"),
             };
 
             if SHOW_PHEROMONES {

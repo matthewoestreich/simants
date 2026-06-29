@@ -6,20 +6,20 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 1;
+pub const NUM_ANTS: usize = 100;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
 pub const ANT_SIZE_MULTIPLIER: u32 = 2;
 // Pixels per second
-pub const ANT_MAX_SPEED: f32 = 90.0;
+pub const ANT_MAX_SPEED: f32 = 40.0;
 // How fast can an ant turn. The higher this value, the longer it will take an ant to face a
 // difffernt direction.
-pub const ANT_MAX_TURN_FORCE: f32 = 35.0;
+pub const ANT_MAX_TURN_FORCE: f32 = 15.0;
 // In radians
-pub const ANT_TURN_ANGLE: f32 = 35.0; //pub const ANT_TURN_ANGLE_RANGE: Range<f32> = -25.0..25.0;
+pub const ANT_TURN_ANGLE: f32 = 25.0; //pub const ANT_TURN_ANGLE_RANGE: Range<f32> = -25.0..25.0;
 // When an ant is at an obstacle, we furst flip the current direction it is facingg, so we need to
 // turn using some degree of random variance as to prevent us from bouncing back and forth in corners.
 // We call this the 'panic' angle range. In radians.
-pub const ANT_OBSTACLE_PANIC_ANGLE_RANGE: Range<f32> = -20.0..20.0;
+pub const ANT_OBSTACLE_PANIC_ANGLE_RANGE: Range<f32> = -30.0..30.0;
 // Should be >= 0.0 and <= 1.0. For example, if the value is === 0.2 then there is a 20% chance o pausing.
 pub const ANT_PAUSE_PROBABILITY: f64 = 0.00019;
 // We choose a random number in this range and have the ant pause for that many seconds
@@ -56,8 +56,8 @@ pub const TITLE: &str = "Ant Simulation";
 pub const SCREEN_WIDTH: i32 = 1200;
 // If either SCREEN_WIDTH or SCREEN_HEIGHT is <= 0 we use full screen width
 pub const SCREEN_HEIGHT: i32 = 800;
-pub const GRID_WIDTH: u32 = 600;
-pub const GRID_HEIGHT: u32 = 400;
+pub const GRID_WIDTH: u32 = 1200;
+pub const GRID_HEIGHT: u32 = 800;
 // N x N pixels
 pub const CELL_SIZE: u32 = 8;
 pub const MAX_RGBA_VALUE: u8 = 255;

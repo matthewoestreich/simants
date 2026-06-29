@@ -62,14 +62,37 @@ impl AntColony {
 /* -------------- SensorReadings ---------------------------------- */
 /* ---------------------------------------------------------------- */
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Debug)]
+pub struct SensorValue<'a> {
+    pub cell: &'a mut Cell,
+    pub pheromone: f32,
+}
+
+impl<'a> SensorValue<'a> {
+    pub fn new_from_ant_state(cell: &'a mut Cell, ant_state: AntState) -> Self {
+        let mut this = Self {
+            cell,
+            pheromone: 0.0,
+        };
+
+        match ant_state {
+            AntState::Foraging => this.pheromone = this.cell.to_food.strength(),
+            AntState::ReturningFood => this.pheromone = this.cell.to_home.strength(),
+            AntState::NoEnergy | AntState::Paused { .. } => {
+                unreachable!("expected Foraging or ReturningFood, got:\n{ant_state:?}\n")
+            }
+        };
+
+        return this;
+    }
+}
+
+#[derive(Debug)]
 pub struct SensorReadings<'a> {
-    pub left: Option<&'a Cell>,
-    pub center: Option<&'a Cell>,
-    pub right: Option<&'a Cell>,
-    pub left_pheromone: f32,
-    pub center_pheromone: f32,
-    pub right_pheromone: f32,
+    pub current: SensorValue<'a>,
+    pub left: SensorValue<'a>,
+    pub center: SensorValue<'a>,
+    pub right: SensorValue<'a>,
 }
 
 /* ---------------------------------------------------------------- */
@@ -108,7 +131,7 @@ impl Ant {
     }
 
     // Depending upon the ants state, the pharomone kind will differ.
-    pub fn sense_environment<'a>(&mut self, grid: &'a Grid) -> SensorReadings<'a> {
+    pub fn sense_environment<'a>(&mut self, grid: &'a mut Grid) -> SensorReadings<'a> {
         // Rotate forward heading vector to find antenna paths
         let center_dir = if self.velocity.length_sqr() > 0.0 {
             self.velocity.normalize()
@@ -127,60 +150,63 @@ impl Ant {
 
         self.sensors = Some((left_position, center_position, right_position));
 
-        let left = grid.get_cell_from_position(left_position);
-        let center = grid.get_cell_from_position(center_position);
-        let right = grid.get_cell_from_position(right_position);
-
-        let (left_pheromone, center_pheromone, right_pheromone) = match self.state {
-            AntState::Foraging => (
-                left.map_or(0.0, |r| r.to_food.strength()),
-                center.map_or(0.0, |r| r.to_food.strength()),
-                right.map_or(0.0, |r| r.to_food.strength()),
-            ),
-            AntState::ReturningFood => (
-                left.map_or(0.0, |r| r.to_home.strength()),
-                center.map_or(0.0, |r| r.to_home.strength()),
-                right.map_or(0.0, |r| r.to_home.strength()),
-            ),
-            _ => unreachable!(
-                "\n\nExpected state to be Foraging or ReturningFood!\n\n{:?}",
-                self
-            ),
-        };
+        let (curr_cell, left_cell, center_cell, right_cell) = grid
+            .get_four_cells_mut(
+                self.position,
+                left_position,
+                center_position,
+                right_position,
+            )
+            .expect("sensor positions overlapped or out ofbounds");
 
         SensorReadings {
-            left,
-            center,
-            right,
-            left_pheromone,
-            center_pheromone,
-            right_pheromone,
+            current: SensorValue::new_from_ant_state(curr_cell, self.state),
+            left: SensorValue::new_from_ant_state(left_cell, self.state),
+            center: SensorValue::new_from_ant_state(center_cell, self.state),
+            right: SensorValue::new_from_ant_state(right_cell, self.state),
         }
     }
 
     pub fn calculate_next_position(
         &mut self,
-        sensor_reading: &SensorReadings<'_>,
+        sensor_reading: &SensorReadings,
         delta_time: f32,
     ) -> Option<Vector2> {
-        let steering_angle = if self.is_foraging() && self.has_sensed(Terrain::Food, sensor_reading)
-        {
-            self.steer_towards_sensor(Terrain::Food, sensor_reading)
-        } else if self.is_returning_food() && self.has_sensed(Terrain::Colony, sensor_reading) {
-            println!("ant sensed colony!");
-            self.steer_towards_sensor(Terrain::Colony, sensor_reading)
-        } else if sensor_reading.center_pheromone > sensor_reading.left_pheromone
-            && sensor_reading.center_pheromone > sensor_reading.right_pheromone
-        {
-            0.0f32.to_radians() // Go straight
-        } else if sensor_reading.left_pheromone > sensor_reading.right_pheromone {
-            -15.0f32.to_radians() // Go left
-        } else if sensor_reading.right_pheromone > sensor_reading.left_pheromone {
-            15.0f32.to_radians() // Go right
-        } else {
-            self.rng // Wander randomly
-                .random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
-                .to_radians()
+        let steering_angle = {
+            // If we hit an obstruction, turn around.
+            if self.has_sensed(Terrain::Border, sensor_reading)
+                || sensor_reading.current.cell.terrain.is_obstruction()
+            {
+                self.velocity *= -1.0;
+                // Return our "panic angle"
+                self.rng
+                    .random_range(ANT_OBSTACLE_PANIC_ANGLE_RANGE)
+                    .to_radians()
+            }
+            // If we are looking for food and sensed food, steer towards it
+            else if self.is_foraging() && self.has_sensed(Terrain::Food, sensor_reading) {
+                self.steer_towards_sensor(Terrain::Food, sensor_reading)
+                    .to_radians()
+            }
+            // If we are returning food and spotted the colony, steer towards it.
+            else if self.is_returning_food() && self.has_sensed(Terrain::Colony, sensor_reading) {
+                self.steer_towards_sensor(Terrain::Colony, sensor_reading)
+                    .to_radians()
+            }
+            // Pheromone based steering, try to sense pheromones to tell us where to go
+            else if sensor_reading.center.pheromone > sensor_reading.left.pheromone
+                && sensor_reading.center.pheromone > sensor_reading.right.pheromone
+            {
+                0.0f32.to_radians() // Go straight
+            } else if sensor_reading.left.pheromone > sensor_reading.right.pheromone {
+                -15.0f32.to_radians() // Go left
+            } else if sensor_reading.right.pheromone > sensor_reading.left.pheromone {
+                15.0f32.to_radians() // Go right
+            } else {
+                self.rng // Wander randomly
+                    .random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
+                    .to_radians()
+            }
         };
 
         let desired_velocity = self.velocity.rotate(steering_angle).normalize() * ANT_MAX_SPEED;
@@ -192,20 +218,20 @@ impl Ant {
         Some(self.position + self.velocity * delta_time)
     }
 
-    pub fn has_sensed(&self, t: Terrain, sensor_reading: &SensorReadings<'_>) -> bool {
+    pub fn has_sensed(&self, t: Terrain, sensor_reading: &SensorReadings) -> bool {
         // Prefer going straight
-        sensor_reading.center.is_some_and(|r| r.terrain == t)
-            || sensor_reading.left.is_some_and(|s| s.terrain == t)
-            || sensor_reading.right.is_some_and(|s| s.terrain == t)
+        sensor_reading.center.cell.terrain == t
+            || sensor_reading.left.cell.terrain == t
+            || sensor_reading.right.cell.terrain == t
     }
 
-    pub fn steer_towards_sensor(&self, t: Terrain, sensor_reading: &SensorReadings<'_>) -> f32 {
+    pub fn steer_towards_sensor(&self, t: Terrain, sensor_reading: &SensorReadings) -> f32 {
         // Prefer going straight
-        if sensor_reading.center.is_some_and(|r| r.terrain == t) {
+        if sensor_reading.center.cell.terrain == t {
             0.0
-        } else if sensor_reading.left.is_some_and(|r| r.terrain == t) {
+        } else if sensor_reading.left.cell.terrain == t {
             -ANT_SENSOR_ANGLE
-        } else if sensor_reading.right.is_some_and(|r| r.terrain == t) {
+        } else if sensor_reading.right.cell.terrain == t {
             ANT_SENSOR_ANGLE
         } else {
             0.0
@@ -284,15 +310,6 @@ impl Ant {
         self.energy <= 0.0 || matches!(self.state, AntState::NoEnergy)
     }
 
-    pub fn turn_around(&mut self) {
-        self.velocity *= -1.0;
-        let panic_angle = self
-            .rng
-            .random_range(ANT_OBSTACLE_PANIC_ANGLE_RANGE)
-            .to_radians();
-        self.velocity = self.velocity.rotate(panic_angle);
-    }
-
     pub fn place_pheromone(&mut self, cell: &mut Cell) {
         if !self.can_place_pheromone() {
             return;
@@ -311,6 +328,15 @@ impl Ant {
                 self.lose_energy(0.25);
             }
         }
+    }
+
+    pub fn turn_around(&mut self) {
+        self.velocity *= -1.0;
+        let panic_angle = self
+            .rng
+            .random_range(ANT_OBSTACLE_PANIC_ANGLE_RANGE)
+            .to_radians();
+        self.velocity = self.velocity.rotate(panic_angle);
     }
 
     pub fn can_place_pheromone(&self) -> bool {

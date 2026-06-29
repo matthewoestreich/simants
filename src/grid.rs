@@ -38,6 +38,48 @@ impl Grid {
         }
     }
 
+    /// Safely gets 4 mutable cell references at once, even if coordinates are arbitrary.
+    /// Returns `None` if any coordinates are out of bounds or overlap with each other.
+    pub(crate) fn get_four_cells_mut(
+        &mut self,
+        p1: Vector2,
+        p2: Vector2,
+        p3: Vector2,
+        p4: Vector2,
+    ) -> Option<(&mut Cell, &mut Cell, &mut Cell, &mut Cell)> {
+        let idx1 = self.get_grid_index_from_position(p1)?;
+        let idx2 = self.get_grid_index_from_position(p2)?;
+        let idx3 = self.get_grid_index_from_position(p3)?;
+        let idx4 = self.get_grid_index_from_position(p4)?;
+
+        // Overlapping mutable references are illegal!
+        if idx1 == idx2
+            || idx1 == idx3
+            || idx1 == idx4
+            || idx2 == idx3
+            || idx2 == idx4
+            || idx3 == idx4
+        {
+            return None;
+        }
+
+        // 3. Obtain a raw pointer to the base slice data
+        let base_ptr = self.cells.as_mut_ptr();
+
+        // SAFETY:
+        // - All indices are validated within bounds by `get_grid_index_from_position`.
+        // - We explicitly verified above that all 4 indices are completely unique (disjoint).
+        // - The lifetime of the returned references is tied directly to `&mut self`.
+        unsafe {
+            Some((
+                &mut *base_ptr.add(idx1),
+                &mut *base_ptr.add(idx2),
+                &mut *base_ptr.add(idx3),
+                &mut *base_ptr.add(idx4),
+            ))
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.cells.len()
     }
@@ -97,6 +139,14 @@ impl Grid {
 
     fn get_grid_index_from_coords(&self, x: u32, y: u32) -> usize {
         (y * self.cols + x) as usize
+    }
+
+    fn get_grid_index_from_position(&self, position: Vector2) -> Option<usize> {
+        let (x, y) = self.position_to_grid_coords(position);
+        //if !self.is_within_grid_bounds(x, y) {
+        //    return None;
+        //}
+        Some(self.get_grid_index_from_coords(x, y))
     }
 }
 

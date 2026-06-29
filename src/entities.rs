@@ -14,6 +14,14 @@ pub enum Terrain {
     Colony,
     Obstacle,
     Border,
+    Invalid,
+}
+
+impl Terrain {
+    // We are obstructed by obstacles and borders
+    pub fn is_obstruction(&self) -> bool {
+        matches!(self, Terrain::Obstacle | Terrain::Border)
+    }
 }
 
 #[derive(Default, Debug, Clone, Copy)]
