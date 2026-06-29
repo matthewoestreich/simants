@@ -48,9 +48,7 @@ fn main() {
 
     while !rl.window_should_close() {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            println!("\n\nMOUSE CLICK DETECTED\n\n");
             let click_position = rl.get_mouse_position();
-
             if let Some((x, y)) = world.screen_to_grid_coords(click_position)
                 && let Some(cell) = world.get_cell(x, y)
             {
@@ -58,7 +56,7 @@ fn main() {
             }
         }
 
-        //world.update(rl.get_frame_time());
+        world.update(rl.get_frame_time());
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
         world.draw(&mut d);

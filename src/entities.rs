@@ -25,8 +25,8 @@ pub enum PheromoneKind {
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Pheromone {
-    pub kind: PheromoneKind,
-    pub strength: f32,
+    kind: PheromoneKind,
+    strength: f32,
 }
 
 impl Pheromone {
@@ -34,12 +34,21 @@ impl Pheromone {
         Self { kind, strength }
     }
 
+    pub fn kind(&self) -> PheromoneKind {
+        self.kind
+    }
+
+    pub fn strength(&self) -> f32 {
+        self.strength
+    }
+
     pub fn set_strength(&mut self, value: f32) {
         self.strength = value;
     }
 
     pub fn weaken(&mut self, amount: f32) {
-        self.strength -= amount;
+        let new_strength = self.strength - amount;
+        self.strength = new_strength.max(0.0);
     }
 
     pub fn strengthen(&mut self, amount: f32) {

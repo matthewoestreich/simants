@@ -1,10 +1,12 @@
 use crate::*;
 
 pub struct World {
-    pub width: i32,
-    pub height: i32,
-    pub screen_offset_x: i32,
-    pub screen_offset_y: i32,
+    pub screen_width: i32,
+    pub screen_height: i32,
+    pub grid_width_pixels: i32,
+    pub grid_height_pixels: i32,
+    //pub screen_offset_x: i32,
+    //pub screen_offset_y: i32,
     pub colony: AntColony,
     grid: Grid,
 }
@@ -19,29 +21,27 @@ impl World {
         colony: AntColony,
     ) -> Self {
         // Calculate screen position to grid cell offset (needed to map a screen position to a cell)
-        let grid_width_in_pixels = (grid_width * cell_size) as i32;
-        let grid_height_in_pixels = (grid_height * cell_size) as i32;
-        let screen_offset_x = (screen_width - grid_width_in_pixels) / 2;
-        let screen_offset_y = (screen_height - grid_height_in_pixels) / 2;
+        //let screen_offset_x = (screen_width - grid_width_in_pixels) / 2;
+        //let screen_offset_y = (screen_height - grid_height_in_pixels) / 2;
 
         // Calculate number of cells per width & height pixels
-        let w = grid_width / cell_size;
-        let h = grid_height / cell_size;
+        let cols = grid_width / cell_size;
+        let rows = grid_height / cell_size;
 
         // For drawing vertical line obstacle in mid of screen
-        let line_len = h / 2;
-        let line_start_y = (h - line_len) / 2;
+        let line_len = rows / 2;
+        let line_start_y = (rows - line_len) / 2;
         let line_end_y = line_start_y + line_len;
-        let mid_w = w / 2;
+        let mid_w = cols / 2;
         let x_range = (mid_w - 1)..=(mid_w + 1);
         let y_range = line_start_y..=line_end_y;
 
         // For drawing food clump
-        let food_center_x = (w * 3) / 4;
-        let food_center_y = h / 2;
+        let food_center_x = (cols * 3) / 4;
+        let food_center_y = rows / 2;
         let food_radius = 6; // Radius measured in number of grid cells
 
-        let mut grid = Grid::new(grid_width, grid_height, cell_size);
+        let mut grid = Grid::new(cols, rows, cell_size);
         let cell_size_f32 = cell_size as f32;
 
         for cell in &mut grid {
@@ -49,7 +49,7 @@ impl World {
             let y = cell.y;
 
             // Mark border cells
-            if x == 0 || x == w - 1 || y == 0 || y == h - 1 {
+            if x == 0 || x == cols - 1 || y == 0 || y == rows - 1 {
                 cell.terrain = Terrain::Border;
                 continue;
             }
@@ -84,12 +84,14 @@ impl World {
         }
 
         Self {
-            width: screen_width,
-            height: screen_height,
+            screen_width,
+            screen_height,
+            grid_width_pixels: grid_width as i32,
+            grid_height_pixels: grid_height as i32,
             grid,
             colony,
-            screen_offset_x,
-            screen_offset_y,
+            //screen_offset_x,
+            //screen_offset_y,
         }
     }
 
@@ -101,9 +103,7 @@ impl World {
         }
 
         for ant in self.colony.ants.iter_mut() {
-            ant.handle_pause(dt);
-
-            if !ant.has_energy() || ant.is_paused() {
+            if ant.is_paused() || ant.is_out_of_energy() {
                 continue;
             }
 
@@ -112,8 +112,15 @@ impl World {
                 .get_cell_mut_from_position(ant.position)
                 .expect("the ant should always be on a valid position, if not we should crash");
 
+            if current_cell.is_obstacle() || current_cell.is_border() {
+                ant.turn_around();
+                continue;
+            }
+
             if current_cell.allows_pheromones() {
+                println!("\nBEFORE\n{ant:?}");
                 ant.place_pheromone(current_cell);
+                println!("AFTER\n{ant:?}\n");
             }
 
             let sensor_readings = ant.sense_environment(&self.grid);
@@ -129,21 +136,29 @@ impl World {
         position.distance_sqr(self.colony.position) < colony_radius
     }
 
+    pub fn is_position_obstacle(&self, position: Vector2) -> bool {
+        self.grid
+            .get_cell_from_position(position)
+            .map(|cell| cell.is_obstacle())
+            .unwrap_or(true)
+    }
+
     pub fn screen_to_grid_coords(&self, position: Vector2) -> Option<(u32, u32)> {
-        let local_x = position.x - self.screen_offset_x as f32;
-        let local_y = position.y - self.screen_offset_y as f32;
+        //let grid_pixel_width = self.grid_width_pixels * self.grid.cell_size as i32;
+        //let grid_pixel_height = self.grid_height_pixels * self.grid.cell_size as i32;
+        let offset_x = (self.screen_width as u32 - self.grid_width_pixels as u32) / 2;
+        let offset_y = (self.screen_height as u32 - self.grid_height_pixels as u32) / 2;
+
+        let local_x = position.x - offset_x as f32;
+        let local_y = position.y - offset_y as f32;
         let grid_x = (local_x / self.grid.cell_size as f32).floor() as i32;
         let grid_y = (local_y / self.grid.cell_size as f32).floor() as i32;
 
         if grid_x > 0
             && grid_y > 0
-            && grid_x < self.grid.width as i32
-            && grid_y < self.grid.height as i32
+            && grid_x < self.grid.cols as i32
+            && grid_y < self.grid.rows as i32
         {
-            println!(
-                "[World][screen_to_grid_coords] Success! screen={position:?} ----->>> (x={grid_x},y={grid_y}) | (x as u32={}, y as u32={})",
-                grid_x as u32, grid_y as u32
-            );
             Some((grid_x as u32, grid_y as u32))
         } else {
             None
@@ -153,6 +168,11 @@ impl World {
     pub fn draw(&mut self, d: &mut RaylibDrawHandle) {
         let cell_size = self.grid.cell_size as i32;
 
+        let grid_pixel_width = self.grid_width_pixels; // (self.grid_width_pixels * self.grid.cell_size as i32);
+        let grid_pixel_height = self.grid_height_pixels; //(self.grid_height_pixels * self.grid.cell_size as i32);
+        let screen_offset_x = (self.screen_width - grid_pixel_width) / 2;
+        let screen_offset_y = (self.screen_height - grid_pixel_height) / 2;
+
         for cell in &mut self.grid {
             let x = cell.x as i32;
             let y = cell.y as i32;
@@ -160,8 +180,8 @@ impl World {
             match cell.terrain {
                 Terrain::Obstacle => {
                     d.draw_rectangle(
-                        self.screen_offset_x + (x * cell_size),
-                        self.screen_offset_y + (y * cell_size),
+                        screen_offset_x + (x * cell_size),
+                        screen_offset_y + (y * cell_size),
                         cell_size,
                         cell_size,
                         OBSTACLE_COLOR,
@@ -170,8 +190,8 @@ impl World {
                 Terrain::Border => {
                     if SHOW_BORDER {
                         d.draw_rectangle(
-                            self.screen_offset_x + (x * cell_size),
-                            self.screen_offset_y + (y * cell_size),
+                            screen_offset_x + (x * cell_size),
+                            screen_offset_y + (y * cell_size),
                             cell_size,
                             cell_size,
                             OBSTACLE_COLOR,
@@ -180,8 +200,8 @@ impl World {
                 }
                 Terrain::Food => {
                     d.draw_rectangle(
-                        self.screen_offset_x + (x * cell_size),
-                        self.screen_offset_y + (y * cell_size),
+                        screen_offset_x + (x * cell_size),
+                        screen_offset_y + (y * cell_size),
                         cell_size,
                         cell_size,
                         Color::GOLD,
@@ -191,8 +211,8 @@ impl World {
                     // Draw standard empty background
                     // Colonies are drawn directly on screen.
                     d.draw_rectangle(
-                        self.screen_offset_x + (x * cell_size),
-                        self.screen_offset_y + (y * cell_size),
+                        screen_offset_x + (x * cell_size),
+                        screen_offset_y + (y * cell_size),
                         cell_size,
                         cell_size,
                         BACKGROUND_COLOR,
@@ -202,25 +222,25 @@ impl World {
 
             if SHOW_PHEROMONES {
                 // If there is searching pheromone here, render it
-                if cell.to_home.strength > 0.0 {
+                if cell.to_home.strength() > 0.0 {
                     let mut color = PHEROMONE_FORAGING_COLOR;
-                    let alpha = cell.to_home.strength / PHEROMONE_MAX_LIFETIME_SECONDS;
+                    let alpha = cell.to_home.strength() / PHEROMONE_MAX_LIFETIME_SECONDS;
                     color.a = (alpha * MAX_RGBA_VALUE as f32) as u8;
                     d.draw_circle(
-                        self.screen_offset_x + (x * cell_size + cell_size / 2),
-                        self.screen_offset_y + (y * cell_size + cell_size / 2),
+                        screen_offset_x + (x * cell_size + cell_size / 2),
+                        screen_offset_y + (y * cell_size + cell_size / 2),
                         cell_size as f32 / 4.0,
                         color,
                     );
                 }
                 // If there is a return trail here, render it
-                if cell.to_food.strength > 0.0 {
+                if cell.to_food.strength() > 0.0 {
                     let mut color = PHEROMONE_RETURNING_FOOD_COLOR;
-                    let alpha = cell.to_food.strength / PHEROMONE_MAX_LIFETIME_SECONDS;
+                    let alpha = cell.to_food.strength() / PHEROMONE_MAX_LIFETIME_SECONDS;
                     color.a = (alpha * MAX_RGBA_VALUE as f32) as u8;
                     d.draw_circle(
-                        self.screen_offset_x + (x * cell_size + cell_size / 2),
-                        self.screen_offset_y + (y * cell_size + cell_size / 2),
+                        screen_offset_x + (x * cell_size + cell_size / 2),
+                        screen_offset_y + (y * cell_size + cell_size / 2),
                         cell_size as f32 / 4.0,
                         color,
                     );
@@ -228,12 +248,16 @@ impl World {
             }
 
             if SHOW_GRID_LINES {
+                if cell.is_border() {
+                    continue;
+                }
+
                 let thickness = 0.5;
                 let line_color = Color::new(80, 80, 80, 255);
 
                 let rect = Rectangle::new(
-                    (self.screen_offset_x + (x * cell_size)) as f32,
-                    (self.screen_offset_y + (y * cell_size)) as f32,
+                    (screen_offset_x + (x * cell_size)) as f32,
+                    (screen_offset_y + (y * cell_size)) as f32,
                     cell_size as f32,
                     cell_size as f32,
                 );
@@ -244,11 +268,10 @@ impl World {
 
         // FIRST : Draw ants
         for ant in &self.colony.ants {
-            ant.draw(d, self.screen_offset_x, self.screen_offset_y);
+            ant.draw(d, screen_offset_x, screen_offset_y);
         }
         // SECOND : Draw colony
-        self.colony
-            .draw(d, self.screen_offset_x, self.screen_offset_y);
+        self.colony.draw(d, screen_offset_x, screen_offset_y);
     }
 
     /// Returns a list of cell coordinates that lie inside the ant's forward vision cone.
@@ -262,8 +285,8 @@ impl World {
 
         let cell_size_f32 = self.grid.cell_size as f32;
         let cell_size_i32 = self.grid.cell_size as i32;
-        let grid_width_i32 = self.grid.width as i32;
-        let grid_height_i32 = self.grid.height as i32;
+        let grid_width_i32 = self.grid.cols as i32;
+        let grid_height_i32 = self.grid.rows as i32;
 
         // 1. Calculate a tight bounding box around the ant's vision area
         let min_x = ((ant.position.x - max_dist) / cell_size_f32).floor() as i32;

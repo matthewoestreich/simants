@@ -2,9 +2,9 @@ use crate::*;
 
 pub struct Grid {
     /// Grid width in pixels - this is NOT number of cols
-    pub width: u32,
+    pub cols: u32,
     /// Grid height in pixels - this is NOT number of rows
-    pub height: u32,
+    pub rows: u32,
     /// Size of a cells width and height in pixels
     pub cell_size: u32,
     cells: Vec<Cell>,
@@ -20,25 +20,26 @@ impl<'a> IntoIterator for &'a mut Grid {
 }
 
 impl Grid {
-    pub fn new(width: u32, height: u32, cell_size: u32) -> Self {
-        let w = width / cell_size;
-        let h = height / cell_size;
-        let size = (w * h) as usize;
-
+    pub fn new(cols: u32, rows: u32, cell_size: u32) -> Self {
+        let size = (cols * rows) as usize;
         let mut cells = Vec::with_capacity(size);
 
-        for y in 0..h {
-            for x in 0..w {
+        for y in 0..rows {
+            for x in 0..cols {
                 cells.push(Cell::new_with_coords(x, y));
             }
         }
 
         Self {
-            width,
-            height,
+            cols,
+            rows,
             cell_size,
             cells,
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.cells.len()
     }
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Cell> {
@@ -91,20 +92,11 @@ impl Grid {
     }
 
     pub fn is_within_grid_bounds(&self, x: u32, y: u32) -> bool {
-        println!(
-            "[Grid][checking_bounds] x= {x} |y= {y} | grid.cells.len= {}",
-            self.cells.len()
-        );
-        x < self.width && y < self.height
+        x < self.cols && y < self.rows
     }
 
     fn get_grid_index_from_coords(&self, x: u32, y: u32) -> usize {
-        let i = (y * self.width + x) as usize;
-        println!(
-            "[Grid][get_grid_index_from_coords] cells.len()={} | coords=(x={x},y={y}) -> index={i}",
-            self.cells.len()
-        );
-        i
+        (y * self.cols + x) as usize
     }
 }
 
@@ -137,6 +129,14 @@ impl Cell {
 
     pub fn is_food(&self) -> bool {
         matches!(self.terrain, Terrain::Food)
+    }
+
+    pub fn is_obstacle(&self) -> bool {
+        matches!(self.terrain, Terrain::Obstacle)
+    }
+
+    pub fn is_border(&self) -> bool {
+        matches!(self.terrain, Terrain::Border)
     }
 
     pub fn allows_pheromones(&self) -> bool {

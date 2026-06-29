@@ -135,16 +135,19 @@ impl Ant {
 
         let (left_pheromone, center_pheromone, right_pheromone) = match self.state {
             AntState::Foraging => (
-                left.map_or(0.0, |r| r.to_food.strength),
-                center.map_or(0.0, |r| r.to_food.strength),
-                right.map_or(0.0, |r| r.to_food.strength),
+                left.map_or(0.0, |r| r.to_food.strength()),
+                center.map_or(0.0, |r| r.to_food.strength()),
+                right.map_or(0.0, |r| r.to_food.strength()),
             ),
             AntState::ReturningFood => (
-                left.map_or(0.0, |r| r.to_home.strength),
-                center.map_or(0.0, |r| r.to_home.strength),
-                right.map_or(0.0, |r| r.to_home.strength),
+                left.map_or(0.0, |r| r.to_home.strength()),
+                center.map_or(0.0, |r| r.to_home.strength()),
+                right.map_or(0.0, |r| r.to_home.strength()),
             ),
-            _ => unreachable!(),
+            _ => unreachable!(
+                "\n\nExpected state to be Foraging or ReturningFood!\n\n{:?}",
+                self
+            ),
         };
 
         SensorReadings {
@@ -162,19 +165,12 @@ impl Ant {
         sensor_reading: &SensorReadings<'_>,
         delta_time: f32,
     ) -> Option<Vector2> {
-        if self.has_sensed(Terrain::Obstacle, &sensor_reading) {
-            self.turn_around();
-            return None;
-        }
-
-        let steering_angle = if self.is_foraging()
-            && let value = self.steer_towards_sensor(Terrain::Food, &sensor_reading)
+        let steering_angle = if self.is_foraging() && self.has_sensed(Terrain::Food, sensor_reading)
         {
-            value
-        } else if self.is_returning_food()
-            && let value = self.steer_towards_sensor(Terrain::Colony, &sensor_reading)
-        {
-            value
+            self.steer_towards_sensor(Terrain::Food, sensor_reading)
+        } else if self.is_returning_food() && self.has_sensed(Terrain::Colony, sensor_reading) {
+            println!("ant sensed colony!");
+            self.steer_towards_sensor(Terrain::Colony, sensor_reading)
         } else if sensor_reading.center_pheromone > sensor_reading.left_pheromone
             && sensor_reading.center_pheromone > sensor_reading.right_pheromone
         {
@@ -341,8 +337,7 @@ impl Ant {
                     .expect("this should never be None when coming out of a pause");
                 self.state_before_pause = None;
             }
-        }
-        if self.should_pause(ANT_PAUSE_PROBABILITY) {
+        } else if self.should_pause(ANT_PAUSE_PROBABILITY) {
             self.state_before_pause = Some(self.state);
             self.state = AntState::Paused {
                 remaining: self.rng.random_range(ANT_PAUSE_FOR_RANGE_IN_SEC),
@@ -376,11 +371,11 @@ impl Ant {
         matches!(self.state, AntState::ReturningFood)
     }
 
-    pub fn has_energy(&self) -> bool {
-        self.energy > 0.0 || !matches!(self.state, AntState::NoEnergy)
+    pub fn is_out_of_energy(&self) -> bool {
+        self.energy <= 0.0 || matches!(self.state, AntState::NoEnergy)
     }
 
-    fn turn_around(&mut self) {
+    pub fn turn_around(&mut self) {
         self.velocity *= -1.0;
         let panic_angle = self
             .rng
@@ -390,19 +385,27 @@ impl Ant {
     }
 
     pub fn place_pheromone(&mut self, cell: &mut Cell) {
+        if !self.can_place_pheromone() {
+            return;
+        }
+
         if self.is_foraging() {
             let strength = PHEROMONE_MAX_LIFETIME_SECONDS * self.energy;
-            if strength > cell.to_home.strength {
-                cell.to_home.strength += strength;
+            if strength > cell.to_home.strength() {
+                cell.to_home.strengthen(strength);
                 self.lose_energy(0.25);
             }
         } else if self.is_returning_food() {
             let strength = PHEROMONE_MAX_LIFETIME_SECONDS * self.energy;
-            if strength > cell.to_food.strength {
-                cell.to_food.strength += strength;
+            if strength > cell.to_food.strength() {
+                cell.to_food.strengthen(strength);
                 self.lose_energy(0.25);
             }
         }
+    }
+
+    pub fn can_place_pheromone(&self) -> bool {
+        self.is_foraging() || self.is_returning_food()
     }
 
     /// `probability_of_pausing` should be >= 0.0 and <= 1.0.
