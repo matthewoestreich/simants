@@ -6,11 +6,13 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 100;
+pub const NUM_ANTS: usize = 1;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
 pub const ANT_SIZE_MULTIPLIER: u32 = 2;
 // Pixels per second
 pub const ANT_MAX_SPEED: f32 = 40.0;
+pub const ANT_MAX_ENERGY: f32 = 1.0;
+pub const ANT_HARVEST_AMOUNT_RANGE: Range<f32> = 0.1..1.0;
 // How fast can an ant turn. The higher this value, the longer it will take an ant to face a
 // difffernt direction.
 pub const ANT_MAX_TURN_FORCE: f32 = 15.0;
@@ -21,11 +23,11 @@ pub const ANT_TURN_ANGLE: f32 = 25.0; //pub const ANT_TURN_ANGLE_RANGE: Range<f3
 // We call this the 'panic' angle range. In radians.
 pub const ANT_OBSTACLE_PANIC_ANGLE_RANGE: Range<f32> = -30.0..30.0;
 // Should be >= 0.0 and <= 1.0. For example, if the value is === 0.2 then there is a 20% chance o pausing.
-pub const ANT_PAUSE_PROBABILITY: f64 = 0.00019;
+pub const ANT_PAUSE_PROBABILITY: f64 = 0.001;
 // We choose a random number in this range and have the ant pause for that many seconds
 pub const ANT_PAUSE_FOR_RANGE_IN_SEC: Range<f32> = 0.5..1.2;
 // The longer an ant walks, the weaker the pheromones it drops are.
-pub const ANT_PHEROMONE_STRENGTH_DECAY: f32 = 0.5;
+pub const ANT_PHEROMONE_STRENGTH_DECAY: f32 = 0.05;
 // Ants have 3 sensors that can 'read' what is in front of them.
 // One directly ahead at some distance, another at some angle to the right of the one directly ahead,
 // and one at the negative value of said angle to the left of the one directly ahead.
@@ -35,8 +37,6 @@ pub const ANT_SENSOR_ANGLE: f32 = 30.0; // In radians
 // How far in front of an ant it will read sensors.
 // This number will be multiplied by the cell size.
 pub const ANT_SENSOR_DISTANCE: u32 = 3;
-// Pheromones slowly evaporate over time.
-pub const PHEROMONE_MAX_LIFETIME_SECONDS: f32 = 60.0;
 
 /* ----------------------------------- */
 /* ------- Hide/Show Entities -------- */
@@ -56,8 +56,8 @@ pub const TITLE: &str = "Ant Simulation";
 pub const SCREEN_WIDTH: i32 = 1200;
 // If either SCREEN_WIDTH or SCREEN_HEIGHT is <= 0 we use full screen width
 pub const SCREEN_HEIGHT: i32 = 800;
-pub const GRID_WIDTH: u32 = 1200;
-pub const GRID_HEIGHT: u32 = 800;
+pub const GRID_WIDTH: u32 = 800;
+pub const GRID_HEIGHT: u32 = 600;
 // N x N pixels
 pub const CELL_SIZE: u32 = 8;
 pub const MAX_RGBA_VALUE: u8 = 255;

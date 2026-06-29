@@ -23,6 +23,7 @@ fn main() {
     }
 
     let (mut rl, thread) = rl_builder.build();
+    rl.set_target_fps(60);
 
     let screen_width = rl.get_screen_width();
     let screen_height = rl.get_screen_height();
@@ -47,16 +48,28 @@ fn main() {
     );
 
     while !rl.window_should_close() {
+        // delta time can range from ~0.01 - 0.0008..
+        // USUALLY it is around 0.0008
+        world.update(rl.get_frame_time());
+
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             let click_position = rl.get_mouse_position();
-            if let Some((x, y)) = world.screen_to_grid_coords(click_position)
+            if let Some(ant) = world.colony.ants.iter().find(|ant| {
+                ant.is_clicked(
+                    click_position,
+                    12.0f32,
+                    world.screen_offset_x,
+                    world.screen_offset_y,
+                )
+            }) {
+                println!("{ant}");
+            } else if let Some((x, y)) = world.screen_to_grid_coords(click_position)
                 && let Some(cell) = world.get_cell(x, y)
             {
                 println!("{cell:?}");
             }
         }
 
-        world.update(rl.get_frame_time());
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
         world.draw(&mut d);

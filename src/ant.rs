@@ -62,37 +62,11 @@ impl AntColony {
 /* -------------- SensorReadings ---------------------------------- */
 /* ---------------------------------------------------------------- */
 
-#[derive(Debug)]
-pub struct SensorValue<'a> {
-    pub cell: &'a mut Cell,
-    pub pheromone: f32,
-}
-
-impl<'a> SensorValue<'a> {
-    pub fn new_from_ant_state(cell: &'a mut Cell, ant_state: AntState) -> Self {
-        let mut this = Self {
-            cell,
-            pheromone: 0.0,
-        };
-
-        match ant_state {
-            AntState::Foraging => this.pheromone = this.cell.to_food.strength(),
-            AntState::ReturningFood => this.pheromone = this.cell.to_home.strength(),
-            AntState::NoEnergy | AntState::Paused { .. } => {
-                unreachable!("expected Foraging or ReturningFood, got:\n{ant_state:?}\n")
-            }
-        };
-
-        return this;
-    }
-}
-
-#[derive(Debug)]
-pub struct SensorReadings<'a> {
-    pub current: SensorValue<'a>,
-    pub left: SensorValue<'a>,
-    pub center: SensorValue<'a>,
-    pub right: SensorValue<'a>,
+pub struct SensorSamples<'a> {
+    pub current: &'a mut Cell,
+    pub left: CellSample,
+    pub center: CellSample,
+    pub right: CellSample,
 }
 
 /* ---------------------------------------------------------------- */
@@ -110,7 +84,7 @@ pub struct Ant {
     pub food: Option<Food>,
 
     // Should really be private
-    pub energy: f32,
+    energy: f32,
     sensors: Option<(Vector2, Vector2, Vector2)>,
     rng: rand::rngs::ThreadRng,
 }
@@ -123,7 +97,7 @@ impl Ant {
         Self {
             position,
             rng,
-            energy: 100.0,
+            energy: ANT_MAX_ENERGY,
             velocity: Vector2::new(forward_direction.cos(), forward_direction.sin())
                 * ANT_MAX_SPEED,
             ..Self::default()
@@ -131,7 +105,7 @@ impl Ant {
     }
 
     // Depending upon the ants state, the pharomone kind will differ.
-    pub fn sense_environment<'a>(&mut self, grid: &'a mut Grid) -> SensorReadings<'a> {
+    pub fn sense_environment<'a>(&mut self, grid: &'a mut Grid) -> SensorSamples<'a> {
         // Rotate forward heading vector to find antenna paths
         let center_dir = if self.velocity.length_sqr() > 0.0 {
             self.velocity.normalize()
@@ -150,33 +124,30 @@ impl Ant {
 
         self.sensors = Some((left_position, center_position, right_position));
 
-        let (curr_cell, left_cell, center_cell, right_cell) = grid
-            .get_four_cells_mut(
-                self.position,
-                left_position,
-                center_position,
-                right_position,
-            )
-            .expect("sensor positions overlapped or out ofbounds");
+        let left = grid.sample_position_with_pheromone_bias(left_position, self.state);
+        let center = grid.sample_position_with_pheromone_bias(center_position, self.state);
+        let right = grid.sample_position_with_pheromone_bias(right_position, self.state);
 
-        SensorReadings {
-            current: SensorValue::new_from_ant_state(curr_cell, self.state),
-            left: SensorValue::new_from_ant_state(left_cell, self.state),
-            center: SensorValue::new_from_ant_state(center_cell, self.state),
-            right: SensorValue::new_from_ant_state(right_cell, self.state),
+        let current = grid
+            .get_cell_mut_from_position(self.position)
+            .expect("current position to always be valid");
+
+        SensorSamples {
+            current,
+            left,
+            center,
+            right,
         }
     }
 
     pub fn calculate_next_position(
         &mut self,
-        sensor_reading: &SensorReadings,
+        sensor_reading: &SensorSamples,
         delta_time: f32,
     ) -> Option<Vector2> {
         let steering_angle = {
             // If we hit an obstruction, turn around.
-            if self.has_sensed(Terrain::Border, sensor_reading)
-                || sensor_reading.current.cell.terrain.is_obstruction()
-            {
+            if sensor_reading.current.terrain.is_obstruction() {
                 self.velocity *= -1.0;
                 // Return our "panic angle"
                 self.rng
@@ -185,6 +156,7 @@ impl Ant {
             }
             // If we are looking for food and sensed food, steer towards it
             else if self.is_foraging() && self.has_sensed(Terrain::Food, sensor_reading) {
+                println!("found food");
                 self.steer_towards_sensor(Terrain::Food, sensor_reading)
                     .to_radians()
             }
@@ -194,13 +166,13 @@ impl Ant {
                     .to_radians()
             }
             // Pheromone based steering, try to sense pheromones to tell us where to go
-            else if sensor_reading.center.pheromone > sensor_reading.left.pheromone
-                && sensor_reading.center.pheromone > sensor_reading.right.pheromone
+            else if sensor_reading.center.pheromone_bias > sensor_reading.left.pheromone_bias
+                && sensor_reading.center.pheromone_bias > sensor_reading.right.pheromone_bias
             {
                 0.0f32.to_radians() // Go straight
-            } else if sensor_reading.left.pheromone > sensor_reading.right.pheromone {
+            } else if sensor_reading.left.pheromone_bias > sensor_reading.right.pheromone_bias {
                 -15.0f32.to_radians() // Go left
-            } else if sensor_reading.right.pheromone > sensor_reading.left.pheromone {
+            } else if sensor_reading.right.pheromone_bias > sensor_reading.left.pheromone_bias {
                 15.0f32.to_radians() // Go right
             } else {
                 self.rng // Wander randomly
@@ -218,24 +190,47 @@ impl Ant {
         Some(self.position + self.velocity * delta_time)
     }
 
-    pub fn has_sensed(&self, t: Terrain, sensor_reading: &SensorReadings) -> bool {
+    pub fn has_sensed(&self, t: Terrain, sensor_reading: &SensorSamples) -> bool {
         // Prefer going straight
-        sensor_reading.center.cell.terrain == t
-            || sensor_reading.left.cell.terrain == t
-            || sensor_reading.right.cell.terrain == t
+        sensor_reading.center.terrain == t
+            || sensor_reading.left.terrain == t
+            || sensor_reading.right.terrain == t
     }
 
-    pub fn steer_towards_sensor(&self, t: Terrain, sensor_reading: &SensorReadings) -> f32 {
+    pub fn steer_towards_sensor(&self, t: Terrain, sensor_reading: &SensorSamples) -> f32 {
         // Prefer going straight
-        if sensor_reading.center.cell.terrain == t {
+        if sensor_reading.center.terrain == t {
             0.0
-        } else if sensor_reading.left.cell.terrain == t {
+        } else if sensor_reading.left.terrain == t {
             -ANT_SENSOR_ANGLE
-        } else if sensor_reading.right.cell.terrain == t {
+        } else if sensor_reading.right.terrain == t {
             ANT_SENSOR_ANGLE
         } else {
             0.0
         }
+    }
+
+    pub fn harvest(&mut self, from: &mut Cell) {
+        let amount = self.rng.random_range(ANT_HARVEST_AMOUNT_RANGE);
+        self.harvest_amount(from, amount);
+    }
+
+    pub fn harvest_amount(&mut self, from: &mut Cell, amount: f32) {
+        if !self.is_foraging() {
+            return;
+        }
+        if let Some(ref mut food) = from.food {
+            *food -= amount;
+            self.state = AntState::ReturningFood;
+        }
+    }
+
+    pub fn deliver_food(&mut self) {
+        if !self.is_returning_food() {
+            return;
+        }
+        self.food = None;
+        self.state = AntState::Foraging;
     }
 
     pub fn steer_towards_position(&self, target: Vector2) -> f32 {
@@ -272,7 +267,8 @@ impl Ant {
                     .expect("this should never be None when coming out of a pause");
                 self.state_before_pause = None;
             }
-        } else if self.should_pause(ANT_PAUSE_PROBABILITY) {
+        }
+        if self.should_pause(ANT_PAUSE_PROBABILITY) {
             self.state_before_pause = Some(self.state);
             self.state = AntState::Paused {
                 remaining: self.rng.random_range(ANT_PAUSE_FOR_RANGE_IN_SEC),
@@ -280,16 +276,23 @@ impl Ant {
         }
     }
 
+    pub fn set_energy(&mut self, value: f32) {
+        self.energy = value.max(0.0);
+        if self.is_out_of_energy() {
+            self.state = AntState::NoEnergy;
+        }
+    }
+
     pub fn lose_energy(&mut self, value: f32) {
-        self.energy -= value;
-        if self.energy <= 0.0 {
+        self.energy = (self.energy - value).max(0.0);
+        if self.is_out_of_energy() {
             self.state = AntState::NoEnergy;
         }
     }
 
     pub fn gain_energy(&mut self, value: f32) {
         self.energy += value;
-        if self.energy > 0.0 && matches!(self.state, AntState::NoEnergy) {
+        if self.is_out_of_energy() {
             self.state = AntState::Foraging;
         }
     }
@@ -316,16 +319,14 @@ impl Ant {
         }
 
         if self.is_foraging() {
-            let strength = PHEROMONE_MAX_LIFETIME_SECONDS * self.energy;
+            let strength = ANT_PHEROMONE_STRENGTH_DECAY * self.energy;
             if strength > cell.to_home.strength() {
                 cell.to_home.strengthen(strength);
-                self.lose_energy(0.25);
             }
         } else if self.is_returning_food() {
-            let strength = PHEROMONE_MAX_LIFETIME_SECONDS * self.energy;
+            let strength = ANT_PHEROMONE_STRENGTH_DECAY * self.energy;
             if strength > cell.to_food.strength() {
                 cell.to_food.strengthen(strength);
-                self.lose_energy(0.25);
             }
         }
     }
@@ -346,7 +347,7 @@ impl Ant {
     /// `probability_of_pausing` should be >= 0.0 and <= 1.0.
     /// If `probability_of_pausing` === 0.2 then there is a 20% chance o pausing.
     pub fn should_pause(&mut self, probability_of_pausing: f64) -> bool {
-        self.rng.random::<f64>() < probability_of_pausing
+        !self.is_paused() && self.rng.random::<f64>() < probability_of_pausing
     }
 
     pub fn draw(&self, d: &mut RaylibDrawHandle, offset_x: i32, offset_y: i32) {
@@ -385,5 +386,70 @@ impl Ant {
             d.draw_circle_v(screen_center_sensor, 1.5, indicator_color);
             d.draw_circle_v(screen_right_sensor, 1.5, indicator_color);
         }
+    }
+}
+
+// For UI stuff
+
+impl Ant {
+    pub fn is_clicked(
+        &self,
+        mouse_screen_pos: Vector2,
+        click_radius: f32,
+        offset_x: i32,
+        offset_y: i32,
+    ) -> bool {
+        let screen_ant_pos = Vector2::new(
+            offset_x as f32 + self.position.x,
+            offset_y as f32 + self.position.y,
+        );
+        let distance_squared = mouse_screen_pos.distance_sqr(screen_ant_pos);
+        let click_radius_squared = click_radius * click_radius;
+        distance_squared <= click_radius_squared
+    }
+}
+
+impl std::fmt::Display for Ant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{{")?;
+
+        writeln!(
+            f,
+            "  position: {{ x: {}, y: {} }}",
+            self.position.x, self.position.y
+        )?;
+
+        writeln!(f, "  energy: {}", self.energy)?;
+        writeln!(f, "  food: {}", self.food.map_or(0, |f| f.amount))?;
+
+        writeln!(
+            f,
+            "  velocity: {{ x: {}, y: {} }}",
+            self.velocity.x, self.velocity.y
+        )?;
+
+        writeln!(
+            f,
+            "  state: {{ current: {:?}, before_pause: {:?}  }}",
+            self.state, self.state_before_pause
+        )?;
+
+        writeln!(
+            f,
+            "  steering_force: {{ x: {}, y: {} }}",
+            self.steering_force.x, self.steering_force.y
+        )?;
+
+        let sensors =
+            self.sensors
+                .unwrap_or((Vector2::default(), Vector2::default(), Vector2::default()));
+
+        writeln!(f, "  sensors: [")?;
+        writeln!(f, "    {{ x: {}, y: {} }}", sensors.0.x, sensors.0.y)?;
+        writeln!(f, "    {{ x: {}, y: {} }}", sensors.1.x, sensors.1.y)?;
+        writeln!(f, "    {{ x: {}, y: {} }}", sensors.2.x, sensors.2.y)?;
+        writeln!(f, "  ]")?;
+
+        writeln!(f, "}}")
     }
 }

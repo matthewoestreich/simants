@@ -38,6 +38,60 @@ impl Grid {
         }
     }
 
+    pub fn position_is_obstruction(&self, position: Vector2) -> bool {
+        if let Some(c) = self.get_cell_from_position(position) {
+            return c.is_obstruction();
+        }
+        true
+    }
+
+    pub fn position_is_terrain(&self, position: Vector2, terrain: Terrain) -> bool {
+        if let Some(c) = self.get_cell_from_position(position) {
+            return c.terrain == terrain;
+        }
+        // If the user wants the check for Invalid and there is no cell found
+        // we can return true since it is technically invalid
+        terrain == Terrain::Invalid
+    }
+
+    pub fn sample_position(&self, position: Vector2) -> CellSample {
+        if let Some(c) = self.get_cell_from_position(position) {
+            return CellSample {
+                terrain: c.terrain,
+                to_food_strength: c.to_food.strength(),
+                to_home_strength: c.to_home.strength(),
+                food_amount: c.food.unwrap_or_default(),
+                ..CellSample::default()
+            };
+        }
+        CellSample {
+            terrain: Terrain::Invalid,
+            ..CellSample::default()
+        }
+    }
+
+    /// Samples a position and only fills out pheromone strength for the appropriate
+    /// pheromone based upon ant state
+    pub fn sample_position_with_pheromone_bias(
+        &self,
+        position: Vector2,
+        ant_state: AntState,
+    ) -> CellSample {
+        let mut this = self.sample_position(position);
+
+        if this.terrain.is_invalid() {
+            return this;
+        }
+
+        match ant_state {
+            AntState::Foraging => this.pheromone_bias = this.to_food_strength,
+            AntState::ReturningFood => this.pheromone_bias = this.to_home_strength,
+            AntState::NoEnergy | AntState::Paused { .. } => {}
+        };
+
+        this
+    }
+
     /// Safely gets 4 mutable cell references at once, even if coordinates are arbitrary.
     /// Returns `None` if any coordinates are out of bounds or overlap with each other.
     pub(crate) fn get_four_cells_mut(
@@ -155,6 +209,15 @@ impl Grid {
 /* ------------------------------------------------------------------------------ */
 
 #[derive(Debug, Default, Clone, Copy)]
+pub struct CellSample {
+    pub terrain: Terrain,
+    pub to_food_strength: f32,
+    pub to_home_strength: f32,
+    pub pheromone_bias: f32,
+    pub food_amount: f32,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Cell {
     pub terrain: Terrain,
     pub to_food: Pheromone,
@@ -177,8 +240,16 @@ impl Cell {
         }
     }
 
+    pub fn is_colony(&self) -> bool {
+        self.terrain.is_colony()
+    }
+
     pub fn is_food(&self) -> bool {
-        matches!(self.terrain, Terrain::Food)
+        self.terrain.is_food()
+    }
+
+    pub fn is_obstruction(&self) -> bool {
+        self.terrain.is_obstruction()
     }
 
     pub fn is_obstacle(&self) -> bool {
