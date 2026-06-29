@@ -58,8 +58,8 @@ impl Grid {
         if let Some(c) = self.get_cell_from_position(position) {
             return CellSample {
                 terrain: c.terrain,
-                to_food_strength: c.to_food.strength(),
-                to_home_strength: c.to_home.strength(),
+                to_food_strength: c.to_food,
+                to_home_strength: c.to_home,
                 food_amount: c.food.unwrap_or_default(),
                 ..CellSample::default()
             };
@@ -90,48 +90,6 @@ impl Grid {
         };
 
         this
-    }
-
-    /// Safely gets 4 mutable cell references at once, even if coordinates are arbitrary.
-    /// Returns `None` if any coordinates are out of bounds or overlap with each other.
-    pub(crate) fn get_four_cells_mut(
-        &mut self,
-        p1: Vector2,
-        p2: Vector2,
-        p3: Vector2,
-        p4: Vector2,
-    ) -> Option<(&mut Cell, &mut Cell, &mut Cell, &mut Cell)> {
-        let idx1 = self.get_grid_index_from_position(p1)?;
-        let idx2 = self.get_grid_index_from_position(p2)?;
-        let idx3 = self.get_grid_index_from_position(p3)?;
-        let idx4 = self.get_grid_index_from_position(p4)?;
-
-        // Overlapping mutable references are illegal!
-        if idx1 == idx2
-            || idx1 == idx3
-            || idx1 == idx4
-            || idx2 == idx3
-            || idx2 == idx4
-            || idx3 == idx4
-        {
-            return None;
-        }
-
-        // 3. Obtain a raw pointer to the base slice data
-        let base_ptr = self.cells.as_mut_ptr();
-
-        // SAFETY:
-        // - All indices are validated within bounds by `get_grid_index_from_position`.
-        // - We explicitly verified above that all 4 indices are completely unique (disjoint).
-        // - The lifetime of the returned references is tied directly to `&mut self`.
-        unsafe {
-            Some((
-                &mut *base_ptr.add(idx1),
-                &mut *base_ptr.add(idx2),
-                &mut *base_ptr.add(idx3),
-                &mut *base_ptr.add(idx4),
-            ))
-        }
     }
 
     pub fn len(&self) -> usize {
@@ -217,11 +175,11 @@ pub struct CellSample {
     pub food_amount: f32,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct Cell {
     pub terrain: Terrain,
-    pub to_food: Pheromone,
-    pub to_home: Pheromone,
+    pub to_food: f32,
+    pub to_home: f32,
     pub food: Option<f32>,
     pub x: u32,
     pub y: u32,

@@ -99,9 +99,8 @@ impl World {
 
     pub fn update(&mut self, delta_time: f32) {
         for cell in self.grid.iter_mut() {
-            // Pheromone time decay/evaporation
-            cell.to_home.weaken(PHEROMONE_EVAPORATION_DECAY_PER_FRAME);
-            cell.to_food.weaken(PHEROMONE_EVAPORATION_DECAY_PER_FRAME);
+            cell.to_food = (cell.to_food - delta_time).max(0.0);
+            cell.to_home = (cell.to_home - delta_time).max(0.0);
         }
 
         for ant in self.colony.ants.iter_mut() {
@@ -110,28 +109,29 @@ impl World {
                 continue;
             }
 
-            let sensor_readings = ant.sense_environment(&mut self.grid);
+            let current_cell = ant.sense_environment(&mut self.grid);
 
-            if ant.is_foraging() && sensor_readings.current.is_food() {
-                ant.harvest(sensor_readings.current);
+            if ant.is_foraging() && current_cell.is_food() {
+                ant.harvest(current_cell);
                 ant.set_energy(ANT_MAX_ENERGY);
+                ant.turn_around();
                 continue;
             }
 
-            if ant.is_returning_food() && sensor_readings.current.is_colony() {
+            if ant.is_returning_food() && current_cell.is_colony() {
                 ant.deliver_food();
                 ant.set_energy(ANT_MAX_ENERGY);
                 continue;
             }
 
-            if sensor_readings.current.allows_pheromones() {
-                ant.place_pheromone(sensor_readings.current);
+            if current_cell.allows_pheromones() {
+                let ant_pheromone_strength = ant.get_energy() / ANT_PHEROMONE_STRENGTH_DECAY;
+                ant.place_pheromone(current_cell, ant_pheromone_strength);
                 let energy_loss_amount = delta_time * ANT_PHEROMONE_STRENGTH_DECAY;
-                //println!("ant lost '{energy_loss_amount}' energy while placing pheromone");
                 ant.lose_energy(energy_loss_amount);
             }
 
-            if let Some(next_position) = ant.calculate_next_position(&sensor_readings, delta_time) {
+            if let Some(next_position) = ant.calculate_next_position(current_cell, delta_time) {
                 ant.position = next_position;
             }
         }
@@ -227,11 +227,10 @@ impl World {
 
             if SHOW_PHEROMONES {
                 // If there is searching pheromone here, render it
-                if cell.to_home.strength() > 0.0 {
+                if cell.to_home > 0.0 {
                     let mut color = PHEROMONE_FORAGING_COLOR;
-                    let alpha = ((cell.to_home.strength() / ANT_PHEROMONE_STRENGTH_DECAY)
-                        * (MAX_RGBA_VALUE as f32))
-                        .min(MAX_RGBA_VALUE as f32);
+                    let intensity = cell.to_home / PHEROMONE_LIFETIME_SECONDS;
+                    let alpha = f32::sqrt(intensity) * MAX_RGBA_VALUE;
                     color.a = alpha as u8;
                     d.draw_circle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
@@ -241,9 +240,9 @@ impl World {
                     );
                 }
                 // If there is a return trail here, render it
-                if cell.to_food.strength() > 0.0 {
+                if cell.to_food > 0.0 {
                     let mut color = PHEROMONE_RETURNING_FOOD_COLOR;
-                    let alpha = cell.to_food.strength() / ANT_PHEROMONE_STRENGTH_DECAY;
+                    let alpha = cell.to_food / ANT_PHEROMONE_STRENGTH_DECAY;
                     color.a = (alpha * MAX_RGBA_VALUE as f32) as u8;
                     d.draw_circle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
