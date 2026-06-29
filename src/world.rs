@@ -117,13 +117,13 @@ impl World {
                 continue;
             }
 
+            let sensor_readings = ant.sense_environment(&self.grid);
+
             if current_cell.allows_pheromones() {
                 println!("\nBEFORE\n{ant:?}");
                 ant.place_pheromone(current_cell);
                 println!("AFTER\n{ant:?}\n");
             }
-
-            let sensor_readings = ant.sense_environment(&self.grid);
 
             if let Some(next_position) = ant.calculate_next_position(&sensor_readings, dt) {
                 ant.position = next_position;

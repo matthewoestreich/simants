@@ -97,14 +97,12 @@ impl Ant {
         let mut rng = rand::rng();
         let forward_direction = rng.random_range(0.0f32..360.0f32).to_radians();
 
-        let velocity =
-            Vector2::new(forward_direction.cos(), forward_direction.sin()) * ANT_MAX_SPEED;
-
         Self {
             position,
             rng,
-            energy: 1.0,
-            velocity,
+            energy: 100.0,
+            velocity: Vector2::new(forward_direction.cos(), forward_direction.sin())
+                * ANT_MAX_SPEED,
             ..Self::default()
         }
     }
@@ -237,95 +235,6 @@ impl Ant {
 
         angle_diff.clamp(-max_turn_rate, max_turn_rate)
     }
-
-    /*
-    pub fn update(&mut self, dt: f32, grid: &mut Grid) {
-        if self.energy <= 0.0 {
-            self.state = AntState::NoEnergy;
-            return;
-        }
-
-        if self.is_paused(dt) {
-            return;
-        }
-
-        if self.food.is_some() && self.sensed_colony() {
-            self.food = None;
-            self.state = AntState::Foraging;
-            self.energy = 1.0;
-            self.turn_around();
-            return;
-        }
-
-        let sensor_distance = (CELL_SIZE * ANT_SENSOR_DISTANCE) as f32;
-
-        // Rotate forward heading vector to find antenna paths
-        let forward = self.velocity.normalize();
-        let left = forward.rotate(ANT_SENSOR_ANGLE);
-        let right = forward.rotate(-ANT_SENSOR_ANGLE);
-
-        let left_sensor_pos = self.position + left * sensor_distance;
-        let forward_sensor_pos = self.position + forward * sensor_distance;
-        let right_sensor_pos = self.position + right * sensor_distance;
-
-        self.sensors = Some((left_sensor_pos, forward_sensor_pos, right_sensor_pos));
-
-        let left_reading = self.sample_grid(grid, left_sensor_pos);
-        let forward_reading = self.sample_grid(grid, forward_sensor_pos);
-        let right_reading = self.sample_grid(grid, right_sensor_pos);
-
-        let (left_smell, center_smell, right_smell) = match self.state {
-            AntState::Foraging => (
-                left_reading.map_or(0.0, |s| s.to_food_strength),
-                forward_reading.map_or(0.0, |s| s.to_food_strength),
-                right_reading.map_or(0.0, |s| s.to_food_strength),
-            ),
-            AntState::ReturningFood => (
-                left_reading.map_or(0.0, |s| s.to_home_strength),
-                forward_reading.map_or(0.0, |s| s.to_home_strength),
-                right_reading.map_or(0.0, |s| s.to_home_strength),
-            ),
-            AntState::NoEnergy | AntState::Paused { .. } => {
-                unreachable!("you removed guard clause didnt you")
-            }
-        };
-
-        let steering_angle = if center_smell > left_smell && center_smell > right_smell {
-            0.0f32.to_radians()
-        } else if left_smell > right_smell {
-            -15.0f32.to_radians()
-        } else if right_smell > left_smell {
-            15.0f32.to_radians()
-        } else {
-            // No pheromone found: fall back to a random search walk
-            self.rng
-                .random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
-                .to_radians()
-        };
-
-        self.try_place_pheromone(grid, dt * ANT_PHEROMONE_STRENGTH_DECAY);
-
-        let desired_velocity = self.velocity.rotate(steering_angle).normalize() * ANT_MAX_SPEED;
-        let steering_force = desired_velocity - self.velocity;
-
-        self.steering_force = steering_force.scale(ANT_MAX_TURN_FORCE * dt);
-        self.velocity += self.steering_force;
-        self.velocity = self.velocity.normalize() * ANT_MAX_SPEED;
-
-        let next_position = self.position + self.velocity * dt;
-
-        if self.is_position_obstacle(next_position, grid) {
-            self.turn_around();
-            return;
-        }
-
-        if self.pick_up_food_from_position(next_position, grid) {
-            self.turn_around();
-        }
-
-        self.position = next_position;
-    }
-    */
 
     pub fn handle_pause(&mut self, decrease_pause_time_by: f32) {
         if let AntState::Paused { ref mut remaining } = self.state {
