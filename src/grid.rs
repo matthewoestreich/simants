@@ -41,34 +41,6 @@ impl Grid {
         }
     }
 
-    pub fn get_sensed_food_position(
-        &self,
-        left_smell: Option<&Cell>,
-        center_smell: Option<&Cell>,
-        right_smell: Option<&Cell>,
-    ) -> Option<Vector2> {
-        [left_smell, center_smell, right_smell]
-            .into_iter()
-            .flatten()
-            .find(|cell| cell.is_food())
-            .and_then(|cell| self.grid_coords_to_screen(cell.x, cell.y))
-    }
-
-    pub fn get_sensed_colony_position(
-        &self,
-        left_smell: Option<&Cell>,
-        center_smell: Option<&Cell>,
-        right_smell: Option<&Cell>,
-        colony_radius: f32,
-        colony_position: Vector2,
-    ) -> Option<Vector2> {
-        [left_smell, center_smell, right_smell]
-            .into_iter()
-            .flatten()
-            .filter_map(|cell| self.grid_coords_to_screen(cell.x, cell.y))
-            .find(|position| position.distance_sqr(colony_position) < colony_radius)
-    }
-
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Cell> {
         self.cells.iter_mut()
     }
@@ -119,11 +91,20 @@ impl Grid {
     }
 
     pub fn is_within_grid_bounds(&self, x: u32, y: u32) -> bool {
+        println!(
+            "[Grid][checking_bounds] x= {x} |y= {y} | grid.cells.len= {}",
+            self.cells.len()
+        );
         x < self.width && y < self.height
     }
 
     fn get_grid_index_from_coords(&self, x: u32, y: u32) -> usize {
-        (y * self.width + x) as usize
+        let i = (y * self.width + x) as usize;
+        println!(
+            "[Grid][get_grid_index_from_coords] cells.len()={} | coords=(x={x},y={y}) -> index={i}",
+            self.cells.len()
+        );
+        i
     }
 }
 
@@ -136,6 +117,7 @@ pub struct Cell {
     pub terrain: Terrain,
     pub to_food: Pheromone,
     pub to_home: Pheromone,
+    pub food: Option<f32>,
     pub x: u32,
     pub y: u32,
 }
@@ -154,10 +136,13 @@ impl Cell {
     }
 
     pub fn is_food(&self) -> bool {
-        matches!(self.terrain, Terrain::Food(_))
+        matches!(self.terrain, Terrain::Food)
     }
 
-    fn terrain_allows_pheromone(&self) -> bool {
-        !matches!(self.terrain, Terrain::Obstacle { .. } | Terrain::Food(_))
+    pub fn allows_pheromones(&self) -> bool {
+        !matches!(
+            self.terrain,
+            Terrain::Obstacle | Terrain::Food | Terrain::Border | Terrain::Colony
+        )
     }
 }

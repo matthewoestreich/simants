@@ -42,31 +42,43 @@ impl World {
         let food_radius = 6; // Radius measured in number of grid cells
 
         let mut grid = Grid::new(grid_width, grid_height, cell_size);
+        let cell_size_f32 = cell_size as f32;
 
         for cell in &mut grid {
             let x = cell.x;
             let y = cell.y;
 
-            // Create border cells
+            // Mark border cells
             if x == 0 || x == w - 1 || y == 0 || y == h - 1 {
-                cell.terrain = Terrain::Obstacle {
-                    kind: Obstacle::Border,
-                };
+                cell.terrain = Terrain::Border;
                 continue;
             }
-            // Draws an obstacle, in the form of a line in the middle of the screen,
-            // that is half the height and centerted horizontally and vertically
+
+            // Marks a cell as an obstacle.
+            // This obstacle will eventually be drawn as a vertical line that is centerted horizontally and vertically
             if x_range.contains(&x) && y_range.contains(&y) {
-                cell.terrain = Terrain::Obstacle {
-                    kind: Obstacle::Normal,
-                };
+                cell.terrain = Terrain::Obstacle;
                 continue;
             }
-            // Draw food clump
+
+            // Marks a cell as food.
             let food_dx = x as i32 - food_center_x as i32;
             let food_dy = y as i32 - food_center_y as i32;
             if food_dx * food_dx + food_dy * food_dy <= food_radius * food_radius {
-                cell.terrain = Terrain::Food(Food::default());
+                cell.terrain = Terrain::Food;
+                cell.food = Some(100.0);
+                continue;
+            }
+
+            // Mark the underlying cells of the colony as such
+            let cell_center = Vector2::new(
+                (x as f32 * cell_size_f32) + (cell_size_f32 / 2.0),
+                (y as f32 * cell_size_f32) + (cell_size_f32 / 2.0),
+            );
+            // If distance from cell center to colony center is less than or
+            // equal to the colony area, it means we are in the colony.
+            if cell_center.distance_sqr(colony.position) <= colony.area {
+                cell.terrain = Terrain::Colony;
                 continue;
             }
         }
@@ -95,64 +107,20 @@ impl World {
                 continue;
             }
 
-            ant.update_sensor_positions();
-
-            // Get readings from our sensors posittions.
-            let left_reading = self
+            let current_cell = self
                 .grid
-                .get_cell_from_position(*ant.get_sensor(SensorPosition::Left));
-            let center_reading = self
-                .grid
-                .get_cell_from_position(*ant.get_sensor(SensorPosition::Center));
-            let right_reading = self
-                .grid
-                .get_cell_from_position(*ant.get_sensor(SensorPosition::Right));
+                .get_cell_mut_from_position(ant.position)
+                .expect("the ant should always be on a valid position, if not we should crash");
 
-            let steering_angle = if ant.is_foraging()
-                && let Some(target) =
-                    self.grid
-                        .get_sensed_food_position(left_reading, center_reading, right_reading)
-            {
-                steer_towards(ant, target)
-            } else if ant.is_returning_food()
-                && let Some(target) = self.grid.get_sensed_colony_position(
-                    left_reading,
-                    center_reading,
-                    right_reading,
-                    self.colony.radius * self.colony.radius,
-                    self.colony.position,
-                )
-            {
-                steer_towards(ant, target)
-            } else if let Some(angle) =
-                handle_pharomone_steering(ant.state, left_reading, center_reading, right_reading)
-            {
-                angle
-            } else {
-                // WANDER RANDOMLY
-                ant.random_wander()
-            };
-
-            // TODO : Place pheromone, if we can
-
-            let desired_velocity = ant.velocity.rotate(steering_angle).normalize() * ANT_MAX_SPEED;
-            let steering_force = desired_velocity - ant.velocity;
-
-            ant.steering_force = steering_force.scale(ANT_MAX_TURN_FORCE * dt);
-            ant.velocity += ant.steering_force;
-            ant.velocity = ant.velocity.normalize() * ANT_MAX_SPEED;
-
-            let next_position = ant.position + ant.velocity * dt;
-
-            if self.is_position_obstacle(next_position, grid) {
-                ant.turn_around();
-                return;
+            if current_cell.allows_pheromones() {
+                ant.place_pheromone(current_cell);
             }
 
-            ant.position = next_position;
+            let sensor_readings = ant.sense_environment(&self.grid);
 
-            // TODO : delete this after refactor
-            //ant.update(dt, &mut self.cells);
+            if let Some(next_position) = ant.calculate_next_position(&sensor_readings, dt) {
+                ant.position = next_position;
+            }
         }
     }
 
@@ -167,7 +135,15 @@ impl World {
         let grid_x = (local_x / self.grid.cell_size as f32).floor() as i32;
         let grid_y = (local_y / self.grid.cell_size as f32).floor() as i32;
 
-        if grid_x > 0 && grid_y > 0 && grid_x < self.width && grid_y < self.height {
+        if grid_x > 0
+            && grid_y > 0
+            && grid_x < self.grid.width as i32
+            && grid_y < self.grid.height as i32
+        {
+            println!(
+                "[World][screen_to_grid_coords] Success! screen={position:?} ----->>> (x={grid_x},y={grid_y}) | (x as u32={}, y as u32={})",
+                grid_x as u32, grid_y as u32
+            );
             Some((grid_x as u32, grid_y as u32))
         } else {
             None
@@ -182,8 +158,17 @@ impl World {
             let y = cell.y as i32;
 
             match cell.terrain {
-                Terrain::Obstacle { kind } => {
-                    if !matches!(kind, Obstacle::Border) || SHOW_BORDER {
+                Terrain::Obstacle => {
+                    d.draw_rectangle(
+                        self.screen_offset_x + (x * cell_size),
+                        self.screen_offset_y + (y * cell_size),
+                        cell_size,
+                        cell_size,
+                        OBSTACLE_COLOR,
+                    );
+                }
+                Terrain::Border => {
+                    if SHOW_BORDER {
                         d.draw_rectangle(
                             self.screen_offset_x + (x * cell_size),
                             self.screen_offset_y + (y * cell_size),
@@ -193,24 +178,18 @@ impl World {
                         );
                     }
                 }
-                Terrain::Food(f) => {
-                    let color = if f.is_harvested {
-                        cell.terrain = Terrain::Empty;
-                        BACKGROUND_COLOR
-                    } else {
-                        Color::GOLD
-                    };
-
+                Terrain::Food => {
                     d.draw_rectangle(
                         self.screen_offset_x + (x * cell_size),
                         self.screen_offset_y + (y * cell_size),
                         cell_size,
                         cell_size,
-                        color,
+                        Color::GOLD,
                     );
                 }
-                _ => {
+                Terrain::Empty | Terrain::Colony => {
                     // Draw standard empty background
+                    // Colonies are drawn directly on screen.
                     d.draw_rectangle(
                         self.screen_offset_x + (x * cell_size),
                         self.screen_offset_y + (y * cell_size),
@@ -352,61 +331,4 @@ impl World {
     pub fn get_cell_mut_from_position(&mut self, position: Vector2) -> Option<&mut Cell> {
         self.grid.get_cell_mut_from_position(position)
     }
-}
-
-fn handle_pharomone_steering(
-    ant_state: AntState,
-    left_smell: Option<&Cell>,
-    center_smell: Option<&Cell>,
-    right_smell: Option<&Cell>,
-) -> Option<f32> {
-    let (left_strength, center_strength, right_strength) = match ant_state {
-        AntState::Foraging => (
-            left_smell.map_or(0.0, |s| s.to_food.strength),
-            center_smell.map_or(0.0, |s| s.to_food.strength),
-            right_smell.map_or(0.0, |s| s.to_food.strength),
-        ),
-        AntState::ReturningFood => (
-            left_smell.map_or(0.0, |s| s.to_home.strength),
-            center_smell.map_or(0.0, |s| s.to_home.strength),
-            right_smell.map_or(0.0, |s| s.to_home.strength),
-        ),
-        AntState::NoEnergy | AntState::Paused { .. } => {
-            unreachable!("you removed guard clause didnt you")
-        }
-    };
-
-    if center_strength > left_strength && center_strength > right_strength {
-        Some(0.0f32.to_radians())
-    } else if left_strength > right_strength {
-        Some(-15.0f32.to_radians())
-    } else if right_strength > left_strength {
-        Some(15.0f32.to_radians())
-    } else {
-        None
-    }
-}
-
-fn steer_towards(ant: &Ant, target: Vector2) -> f32 {
-    let to_target = target - ant.position;
-
-    if to_target.length_sqr() <= 0.001 {
-        return 0.0;
-    }
-
-    let current_angle = ant.velocity.y.atan2(ant.velocity.x);
-    let target_angle = to_target.y.atan2(to_target.x);
-
-    let mut angle_diff = target_angle - current_angle;
-
-    while angle_diff > std::f32::consts::PI {
-        angle_diff -= 2.0 * std::f32::consts::PI;
-    }
-    while angle_diff < -std::f32::consts::PI {
-        angle_diff += 2.0 * std::f32::consts::PI;
-    }
-
-    let max_turn_rate = ANT_TURN_ANGLE.to_radians();
-
-    angle_diff.clamp(-max_turn_rate, max_turn_rate)
 }

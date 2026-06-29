@@ -1,4 +1,4 @@
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct Food {
     pub pos_x: i32,
     pub pos_y: i32,
@@ -6,21 +6,14 @@ pub struct Food {
     pub is_harvested: bool,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
-pub enum Obstacle {
-    #[default]
-    Normal,
-    Border,
-}
-
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub enum Terrain {
     #[default]
     Empty,
-    Food(Food),
-    Obstacle {
-        kind: Obstacle,
-    },
+    Food,
+    Colony,
+    Obstacle,
+    Border,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
