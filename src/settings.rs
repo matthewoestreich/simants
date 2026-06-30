@@ -6,11 +6,15 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 10000;
+pub const NUM_ANTS: usize = 100;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
 pub const ANT_SIZE_MULTIPLIER: f32 = 1.5;
 // Pixels per second
 pub const ANT_MAX_SPEED: f32 = 40.0;
+pub const ANT_SPEED_WOBBLE_PERCENT: f32 = 15.0;
+pub const ANT_ACCELERATION_RATE: f32 = 5.0;
+// Ants carrying food are naturally slower. If this value is 0.70, it will slow the ant down 30%
+pub const ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT: f32 = 0.70;
 pub const ANT_MAX_PHEROMONE_CAPACITY: f32 = 10.0;
 pub const ANT_HARVEST_AMOUNT_RANGE: Range<f32> = 10.0..50.0;
 // How fast can an ant turn. The higher this value, the longer it will take an ant to face a
@@ -28,6 +32,7 @@ pub const ANT_PAUSE_PROBABILITY: f64 = 0.001;
 pub const ANT_PAUSE_FOR_RANGE_IN_SEC: Range<f32> = 0.5..1.2;
 // The longer an ant walks, the weaker the pheromones it drops are.
 pub const ANT_PHEROMONE_LOSS_RATE: f32 = 0.49;
+pub const ANT_PHEROMONE_MULTIPLIER: f32 = 20.0;
 // Ants have 3 sensors that can 'read' what is in front of them.
 // One directly ahead at some distance, another at some angle to the right of the one directly ahead,
 // and one at the negative value of said angle to the left of the one directly ahead.
@@ -38,7 +43,6 @@ pub const ANT_SENSOR_ANGLE: f32 = 45.0; // In radians
 // This number will be multiplied by the cell size.
 pub const ANT_SENSOR_DISTANCE: u32 = 2;
 
-pub const PHEROMONE_LIFETIME_SECONDS: f32 = 20.0;
 pub const PHEROMONE_DECAY_RATE: f32 = 0.005;
 
 pub const FOOD_CELL_MAX_AMOUNT: f32 = 10000000.0;
@@ -66,7 +70,7 @@ pub const SCREEN_HEIGHT: i32 = 800;
 pub const GRID_WIDTH: u32 = 1200;
 pub const GRID_HEIGHT: u32 = 800;
 // N x N pixels
-pub const CELL_SIZE: u32 = 4;
+pub const CELL_SIZE: u32 = 8;
 pub const MAX_RGBA_VALUE: f32 = 255.0;
 
 /* ----------------------------------- */

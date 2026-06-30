@@ -165,7 +165,6 @@ impl World {
                 if is_same_position(colony_center, ant.position, self.grid.cell_size) {
                     ant.deliver_food();
                     ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
-                    //ant.turn_around();
                     ant.turn_in_any_direction();
                     continue;
                 }
@@ -175,13 +174,12 @@ impl World {
 
             if !ant.is_out_of_pheromones() && current_cell.allows_pheromones() {
                 let drop_strength = World::calculate_decayed_amount(
-                    PHEROMONE_LIFETIME_SECONDS * ant.get_pheromones_remaining(),
+                    ANT_PHEROMONE_MULTIPLIER * ant.get_pheromones_remaining(),
                     delta_time,
                     ANT_PHEROMONE_LOSS_RATE,
                 );
                 ant.place_pheromone(current_cell, drop_strength);
-                let pheromone_loss_amount = delta_time * ANT_PHEROMONE_LOSS_RATE;
-                ant.lose_pheromones(pheromone_loss_amount);
+                ant.lose_pheromones(delta_time * ANT_PHEROMONE_LOSS_RATE);
             }
 
             if let Some(next_position) = ant.calculate_next_position(current_cell, delta_time) {

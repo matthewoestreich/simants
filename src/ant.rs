@@ -87,6 +87,7 @@ pub struct Ant {
     pub id: i32,
     pub position: Vector2,
     pub velocity: Vector2,
+    pub speed: f32,
     pub state: AntState,
     pub state_before_pause: Option<AntState>,
     pub steering_force: Vector2,
@@ -110,6 +111,7 @@ impl Ant {
         Self {
             position,
             rng,
+            speed: ANT_MAX_SPEED,
             pheromone_tank: ANT_MAX_PHEROMONE_CAPACITY,
             velocity: Vector2::new(forward_direction.cos(), forward_direction.sin())
                 * ANT_MAX_SPEED,
@@ -186,14 +188,12 @@ impl Ant {
                 > self.sensor_samples.right.pheromone_bias
             {
                 -ANT_SENSOR_ANGLE.to_radians()
-                //-15.0f32.to_radians() // Go left
             }
             // go right
             else if self.sensor_samples.right.pheromone_bias
                 > self.sensor_samples.left.pheromone_bias
             {
                 ANT_SENSOR_ANGLE.to_radians()
-                //15.0f32.to_radians() // Go right
             }
             // wander randomly
             else {
@@ -208,16 +208,34 @@ impl Ant {
     }
 
     pub fn steer(&mut self, steering_angle: f32, delta_time: f32) {
-        let desired_velocity = self.velocity.rotate(steering_angle).normalize() * ANT_MAX_SPEED;
+        self.apply_speed_wobble(delta_time);
+        let desired_velocity = self.velocity.rotate(steering_angle).normalize() * self.speed;
         let steering_force = desired_velocity - self.velocity;
         self.steering_force = steering_force.scale(ANT_MAX_TURN_FORCE * delta_time);
         self.velocity += self.steering_force;
+        if self.velocity.length_sqr() > 0.001 {
+            self.velocity = self.velocity.normalize() * self.speed;
+        }
     }
 
     pub fn has_sensed(&self, t: Terrain) -> bool {
         let samples = &self.sensor_samples;
         // Prefer going straight
         samples.center.terrain == t || samples.left.terrain == t || samples.right.terrain == t
+    }
+
+    pub fn apply_speed_wobble(&mut self, delta_time: f32) {
+        let mut target_speed = ANT_MAX_SPEED;
+
+        if self.is_foraging() {
+            target_speed += self
+                .rng
+                .random_range(-ANT_SPEED_WOBBLE_PERCENT..=ANT_SPEED_WOBBLE_PERCENT);
+        } else if self.is_returning_food() {
+            target_speed *= ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT;
+        }
+
+        self.speed = self.speed + (target_speed - self.speed) * ANT_ACCELERATION_RATE * delta_time;
     }
 
     // If the provided terrain is not sensed we return None and thereore do not change steering.
@@ -231,23 +249,17 @@ impl Ant {
         let cb = samples.center.pheromone_bias;
         let rb = samples.right.pheromone_bias;
 
-        if lb == 0.0 && cb == 0.0 && rb == 0.0 {
+        if cb > lb && cb > rb {
             return Some(0.0f32);
         }
-
-        let mut out = None;
-
-        if cb > lb && cb > rb {
-            out = Some(0.0f32);
-        }
         if lb > cb && lb > rb {
-            out = Some(-ANT_SENSOR_ANGLE);
+            return Some(-ANT_SENSOR_ANGLE);
         }
         if rb > cb && rb > lb {
-            out = Some(ANT_SENSOR_ANGLE);
+            return Some(ANT_SENSOR_ANGLE);
         }
 
-        out
+        Some(0.0f32) // default to going straight
     }
 
     pub fn harvest(&mut self, from: &mut Cell) {
@@ -362,11 +374,6 @@ impl Ant {
         if self.is_returning_food() && strength > cell.to_food {
             cell.to_food = strength;
         }
-    }
-
-    fn get_turn_around_angle(&mut self) -> f32 {
-        let half_wedge = 90.0f32.to_radians();
-        self.rng.random_range(-half_wedge..=half_wedge)
     }
 
     pub fn turn_around(&mut self) {
