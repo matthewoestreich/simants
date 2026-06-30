@@ -29,7 +29,7 @@ fn main() {
     let screen_height = rl.get_screen_height();
     //let grid_width = screen_width.max(0) as u32 - (40 * CELL_SIZE);
     //let grid_height = screen_height.max(0) as u32 - (20 * CELL_SIZE);
-    let colony_position_x = GRID_WIDTH as f32 / 4.0;
+    let colony_position_x = GRID_WIDTH as f32 / 8.0;
     let colony_position_y = GRID_HEIGHT as f32 / 2.0;
 
     let colony = AntColony::new_with_immediate_spawn(
@@ -48,19 +48,27 @@ fn main() {
         SHOW_GRID_LINES,
         SHOW_PHEROMONES,
         SHOW_BORDER,
+        SHOW_ANT_SENSORS,
     );
+
+    let show_pheromones_toggle_key = KeyboardKey::KEY_P;
+    let show_border_toggle_key = KeyboardKey::KEY_B;
+    let show_grid_toggle_key = KeyboardKey::KEY_G;
+    let show_ant_sensors_toggle_key = KeyboardKey::KEY_S;
 
     while !rl.window_should_close() {
         // delta time can range from ~0.01 - 0.0008..
         // USUALLY it is around 0.0008
         world.update(rl.get_frame_time());
 
-        if rl.is_key_pressed(KeyboardKey::KEY_P) {
+        if rl.is_key_pressed(show_pheromones_toggle_key) {
             world.toggle_show_pheromones();
-        } else if rl.is_key_pressed(KeyboardKey::KEY_B) {
+        } else if rl.is_key_pressed(show_border_toggle_key) {
             world.toggle_show_border();
-        } else if rl.is_key_pressed(KeyboardKey::KEY_G) {
+        } else if rl.is_key_pressed(show_grid_toggle_key) {
             world.toggle_show_grid();
+        } else if rl.is_key_pressed(show_ant_sensors_toggle_key) {
+            world.toggle_show_ant_sensors();
         }
 
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
@@ -83,7 +91,6 @@ fn main() {
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
-        d.begin_blend_mode(BlendMode::BLEND_ADDITIVE);
         world.draw(&mut d);
     }
 }

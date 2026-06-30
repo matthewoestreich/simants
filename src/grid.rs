@@ -60,7 +60,7 @@ impl Grid {
                 terrain: c.terrain,
                 to_food_strength: c.to_food,
                 to_home_strength: c.to_home,
-                food_amount: c.food.unwrap_or_default(),
+                food_amount: c.food,
                 ..CellSample::default()
             };
         }
@@ -84,9 +84,21 @@ impl Grid {
         }
 
         match ant_state {
-            AntState::Foraging => this.pheromone_bias = this.to_food_strength,
-            AntState::ReturningFood => this.pheromone_bias = this.to_home_strength,
-            AntState::NoEnergy | AntState::Paused { .. } => {}
+            AntState::Foraging => {
+                this.pheromone_bias = this.to_food_strength;
+
+                if this.terrain.is_food() {
+                    this.pheromone_bias += 1000.0;
+                }
+            }
+            AntState::ReturningFood => {
+                this.pheromone_bias = this.to_home_strength;
+
+                if this.terrain.is_colony() {
+                    this.pheromone_bias += 1000.0;
+                }
+            }
+            AntState::Paused { .. } => {}
         };
 
         this
@@ -180,7 +192,7 @@ pub struct Cell {
     pub terrain: Terrain,
     pub to_food: f32,
     pub to_home: f32,
-    pub food: Option<f32>,
+    pub food: f32,
     pub x: u32,
     pub y: u32,
 }
@@ -196,6 +208,15 @@ impl Cell {
             y,
             ..Self::default()
         }
+    }
+
+    /// Exponentially decreases the trail strength over time.
+    /// `decay_rate` controls the speed of the fade (e.g., 0.1 means 10% loss per second).
+    pub fn evaporate(&mut self, delta_time: f32, decay_rate: f32) {
+        let evap_to_food = World::calculate_decayed_amount(self.to_food, delta_time, decay_rate);
+        self.to_food = evap_to_food;
+        let evap_to_home = World::calculate_decayed_amount(self.to_home, delta_time, decay_rate);
+        self.to_home = evap_to_home;
     }
 
     pub fn is_colony(&self) -> bool {

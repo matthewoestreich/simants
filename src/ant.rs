@@ -6,7 +6,6 @@ pub enum AntState {
     #[default]
     Foraging,
     ReturningFood,
-    NoEnergy,
     Paused {
         remaining: f32,
     },
@@ -91,14 +90,16 @@ pub struct Ant {
     pub state: AntState,
     pub state_before_pause: Option<AntState>,
     pub steering_force: Vector2,
-    pub food: Food,
+    pub food: f32,
     pub total_food_harvested: f32,
 
     // Should really be private
-    energy: f32,
+    pheromone_tank: f32,
     sensors: Option<(Vector2, Vector2, Vector2)>,
     sensor_samples: SensorSamples,
     rng: rand::rngs::ThreadRng,
+
+    draw_sensors: bool,
 }
 
 impl Ant {
@@ -109,7 +110,7 @@ impl Ant {
         Self {
             position,
             rng,
-            energy: ANT_MAX_ENERGY,
+            pheromone_tank: ANT_MAX_PHEROMONE_CAPACITY,
             velocity: Vector2::new(forward_direction.cos(), forward_direction.sin())
                 * ANT_MAX_SPEED,
             ..Self::default()
@@ -184,13 +185,15 @@ impl Ant {
             else if self.sensor_samples.left.pheromone_bias
                 > self.sensor_samples.right.pheromone_bias
             {
-                -15.0f32.to_radians() // Go left
+                -ANT_SENSOR_ANGLE.to_radians()
+                //-15.0f32.to_radians() // Go left
             }
             // go right
             else if self.sensor_samples.right.pheromone_bias
                 > self.sensor_samples.left.pheromone_bias
             {
-                15.0f32.to_radians() // Go right
+                ANT_SENSOR_ANGLE.to_radians()
+                //15.0f32.to_radians() // Go right
             }
             // wander randomly
             else {
@@ -200,13 +203,7 @@ impl Ant {
             }
         };
 
-        //let desired_velocity = self.velocity.rotate(steering_angle).normalize() * ANT_MAX_SPEED;
-        //let steering_force = desired_velocity - self.velocity;
-        //self.steering_force = steering_force.scale(ANT_MAX_TURN_FORCE * delta_time);
-        //self.velocity += self.steering_force;
-
         self.steer(steering_angle, delta_time);
-
         Some(self.position + self.velocity * delta_time)
     }
 
@@ -225,39 +222,55 @@ impl Ant {
 
     // If the provided terrain is not sensed we return None and thereore do not change steering.
     pub fn steer_towards_sensor(&self, t: Terrain) -> Option<f32> {
-        let samples = &self.sensor_samples;
-
-        // Prefer going straight
-        if samples.center.terrain == t {
-            Some(0.0)
-        } else if samples.left.terrain == t {
-            Some(-ANT_SENSOR_ANGLE)
-        } else if samples.right.terrain == t {
-            Some(ANT_SENSOR_ANGLE)
-        } else {
-            None
+        if !self.has_sensed(t) {
+            return None;
         }
+
+        let samples = &self.sensor_samples;
+        let lb = samples.left.pheromone_bias;
+        let cb = samples.center.pheromone_bias;
+        let rb = samples.right.pheromone_bias;
+
+        if lb == 0.0 && cb == 0.0 && rb == 0.0 {
+            return Some(0.0f32);
+        }
+
+        let mut out = None;
+
+        if cb > lb && cb > rb {
+            out = Some(0.0f32);
+        }
+        if lb > cb && lb > rb {
+            out = Some(-ANT_SENSOR_ANGLE);
+        }
+        if rb > cb && rb > lb {
+            out = Some(ANT_SENSOR_ANGLE);
+        }
+
+        out
     }
 
     pub fn harvest(&mut self, from: &mut Cell) {
-        let amount = self.rng.random_range(ANT_HARVEST_AMOUNT_RANGE);
+        let amount = self
+            .rng
+            .random_range(ANT_HARVEST_AMOUNT_RANGE)
+            .min(from.food);
         self.harvest_amount(from, amount);
     }
 
     pub fn harvest_amount(&mut self, from: &mut Cell, amount: f32) {
-        if !self.is_foraging() {
+        if from.food <= 0.0 {
             return;
         }
-        if let Some(ref mut food) = from.food {
-            *food -= amount;
-            self.state = AntState::ReturningFood;
-        }
+        from.food -= amount;
+        self.food += amount;
+        self.state = AntState::ReturningFood;
     }
 
     pub fn deliver_food(&mut self) {
         assert!(self.is_returning_food());
-        self.total_food_harvested += self.food.amount;
-        self.food.amount = 0.0;
+        self.total_food_harvested += self.food;
+        self.food = 0.0;
         self.state = AntState::Foraging;
     }
 
@@ -286,7 +299,7 @@ impl Ant {
 
     pub fn handle_pause(&mut self, decrease_pause_time_by: f32) {
         if let AntState::Paused { ref mut remaining } = self.state {
-            self.energy += 0.001;
+            self.pheromone_tank += 0.001;
             *remaining -= decrease_pause_time_by;
             if *remaining <= 0.0 {
                 self.state = self
@@ -303,27 +316,21 @@ impl Ant {
         }
     }
 
-    pub fn set_energy(&mut self, value: f32) {
-        self.energy = value.max(0.0);
-        if self.is_out_of_energy() {
-            self.state = AntState::NoEnergy;
-        }
+    pub fn set_pheromone_tank(&mut self, value: f32) {
+        self.pheromone_tank = value.max(0.0);
     }
 
-    pub fn get_energy(&self) -> f32 {
-        self.energy
+    pub fn get_pheromones_remaining(&self) -> f32 {
+        self.pheromone_tank
     }
 
-    pub fn lose_energy(&mut self, value: f32) {
-        self.energy = (self.energy - value).max(0.0);
-        if self.is_out_of_energy() {
-            self.state = AntState::NoEnergy;
-        }
+    pub fn lose_pheromones(&mut self, value: f32) {
+        self.pheromone_tank = (self.pheromone_tank - value).max(0.0);
     }
 
-    pub fn gain_energy(&mut self, value: f32) {
-        self.energy += value;
-        if self.is_out_of_energy() {
+    pub fn add_pheromones(&mut self, value: f32) {
+        self.pheromone_tank += value;
+        if self.is_out_of_pheromones() {
             self.state = AntState::Foraging;
         }
     }
@@ -340,8 +347,8 @@ impl Ant {
         matches!(self.state, AntState::ReturningFood)
     }
 
-    pub fn is_out_of_energy(&self) -> bool {
-        self.energy <= 0.0 || matches!(self.state, AntState::NoEnergy)
+    pub fn is_out_of_pheromones(&self) -> bool {
+        self.pheromone_tank <= 0.0
     }
 
     pub fn place_pheromone(&mut self, cell: &mut Cell, strength: f32) {
@@ -371,6 +378,14 @@ impl Ant {
         self.velocity = self.velocity.rotate(panic_angle);
     }
 
+    pub fn turn_in_any_direction(&mut self) {
+        let angle = self
+            .rng // Wander randomly
+            .random_range(-360.0f32..360.0f32)
+            .to_radians();
+        self.velocity = self.velocity.rotate(angle);
+    }
+
     pub fn can_place_pheromone(&self) -> bool {
         self.is_foraging() || self.is_returning_food()
     }
@@ -381,12 +396,11 @@ impl Ant {
         !self.is_paused() && self.rng.random::<f64>() < probability_of_pausing
     }
 
-    pub fn draw(&self, d: &mut RaylibDrawHandle, offset_x: i32, offset_y: i32) {
+    pub fn draw(&self, d: &mut RaylibDrawHandle, draw_sensors: bool, offset_x: i32, offset_y: i32) {
         let color = match self.state {
             AntState::Foraging => ANT_FORAGING_COLOR,
             AntState::ReturningFood => ANT_RETURNING_FOOD_COLOR,
             AntState::Paused { .. } => Color::YELLOW,
-            AntState::NoEnergy => Color::RED,
         };
 
         let forward = self.velocity.normalize();
@@ -404,7 +418,7 @@ impl Ant {
         let right_back = position - (forward * (ant_length / 2.0)) + (right * (ant_width / 2.0));
         d.draw_triangle(spear, left_back, right_back, color);
 
-        if SHOW_ANT_SENSORS && let Some((l, c, r)) = self.sensors {
+        if draw_sensors && let Some((l, c, r)) = self.sensors {
             let indicator_color = Color::PINK;
             let screen_left_sensor = Vector2::new(ox + l.x, oy + l.y);
             let screen_center_sensor = Vector2::new(ox + c.x, oy + c.y);
@@ -450,11 +464,11 @@ impl std::fmt::Display for Ant {
             self.position.x, self.position.y
         )?;
 
-        writeln!(f, "  energy: {}", self.energy)?;
+        writeln!(f, "  pheromone_tank: {}", self.pheromone_tank)?;
         writeln!(
             f,
             "  food: {{ carrying: {}, total_harvested: {} }}",
-            self.food.amount, self.total_food_harvested
+            self.food, self.total_food_harvested
         )?;
 
         writeln!(

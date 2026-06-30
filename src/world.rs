@@ -13,6 +13,7 @@ pub struct World {
     pub show_grid: bool,
     pub show_pheromones: bool,
     pub show_border: bool,
+    pub show_ant_sensors: bool,
 }
 
 pub fn is_same_position(position: Vector2, other_position: Vector2, cell_size: u32) -> bool {
@@ -33,6 +34,7 @@ impl World {
         show_grid: bool,
         show_pheromones: bool,
         show_border: bool,
+        show_ant_sensors: bool,
     ) -> Self {
         // Calculate screen position to grid cell offset (needed to map a screen position to a cell)
         let screen_offset_x = (screen_width - grid_width as i32) / 2;
@@ -80,7 +82,7 @@ impl World {
             let food_dy = y as i32 - food_center_y as i32;
             if food_dx * food_dx + food_dy * food_dy <= food_radius as i32 * food_radius as i32 {
                 cell.terrain = Terrain::Food;
-                cell.food = Some(100.0);
+                cell.food = FOOD_CELL_MAX_AMOUNT;
                 continue;
             }
 
@@ -109,6 +111,7 @@ impl World {
             show_grid,
             show_pheromones,
             show_border,
+            show_ant_sensors,
         }
     }
 
@@ -124,19 +127,25 @@ impl World {
         self.show_grid = !self.show_grid;
     }
 
+    pub fn toggle_show_ant_sensors(&mut self) {
+        self.show_ant_sensors = !self.show_ant_sensors;
+    }
+
     pub fn update(&mut self, delta_time: f32) {
         for cell in self.grid.iter_mut() {
-            cell.to_food = (cell.to_food - delta_time).max(0.0);
-            cell.to_home = (cell.to_home - delta_time).max(0.0);
+            if cell.is_food() && cell.food <= 0.0 {
+                cell.terrain = Terrain::Empty;
+                continue;
+            }
+            if cell.is_colony() || cell.is_obstruction() {
+                continue;
+            }
+            cell.evaporate(delta_time, PHEROMONE_DECAY_RATE);
         }
 
         let colony_center = self.colony.position;
 
         for ant in &mut self.colony.ants {
-            if ant.is_out_of_energy() {
-                continue;
-            }
-
             ant.handle_pause(delta_time);
 
             if ant.is_paused() {
@@ -147,27 +156,32 @@ impl World {
 
             if ant.is_foraging() && current_cell.is_food() {
                 ant.harvest(current_cell);
-                ant.set_energy(ANT_MAX_ENERGY);
+                ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                 ant.turn_around();
                 continue;
             }
 
             if ant.is_returning_food() && current_cell.is_colony() {
-                if !is_same_position(colony_center, ant.position, self.grid.cell_size) {
-                    ant.steer_towards_position(colony_center, delta_time);
+                if is_same_position(colony_center, ant.position, self.grid.cell_size) {
+                    ant.deliver_food();
+                    ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
+                    //ant.turn_around();
+                    ant.turn_in_any_direction();
                     continue;
                 }
-                ant.deliver_food();
-                ant.set_energy(ANT_MAX_ENERGY);
-                ant.turn_around();
+                ant.steer_towards_position(colony_center, delta_time);
                 continue;
             }
 
-            if current_cell.allows_pheromones() {
-                let drop_strength = PHEROMONE_LIFETIME_SECONDS * ant.get_energy();
+            if !ant.is_out_of_pheromones() && current_cell.allows_pheromones() {
+                let drop_strength = World::calculate_decayed_amount(
+                    PHEROMONE_LIFETIME_SECONDS * ant.get_pheromones_remaining(),
+                    delta_time,
+                    ANT_PHEROMONE_LOSS_RATE,
+                );
                 ant.place_pheromone(current_cell, drop_strength);
-                let energy_loss_amount = delta_time * ANT_PHEROMONE_STRENGTH_DECAY;
-                ant.lose_energy(energy_loss_amount);
+                let pheromone_loss_amount = delta_time * ANT_PHEROMONE_LOSS_RATE;
+                ant.lose_pheromones(pheromone_loss_amount);
             }
 
             if let Some(next_position) = ant.calculate_next_position(current_cell, delta_time) {
@@ -178,6 +192,20 @@ impl World {
                 ant.position = next_position;
             }
         }
+    }
+
+    pub fn calculate_decayed_amount(strength: f32, delta_time: f32, decay_rate: f32) -> f32 {
+        if strength <= 0.0 {
+            return 0.0;
+        }
+
+        let factor = f32::exp(-decay_rate * delta_time);
+        let amount = strength * factor;
+
+        if amount < 0.1 {
+            return 0.0;
+        }
+        amount
     }
 
     pub fn is_colony_position(&self, position: Vector2) -> bool {
@@ -215,10 +243,13 @@ impl World {
     pub fn draw(&mut self, d: &mut RaylibDrawHandle) {
         let cell_size = self.grid.cell_size as i32;
 
-        let grid_pixel_width = self.grid_width_pixels; // (self.grid_width_pixels * self.grid.cell_size as i32);
-        let grid_pixel_height = self.grid_height_pixels; //(self.grid_height_pixels * self.grid.cell_size as i32);
-        let screen_offset_x = (self.screen_width - grid_pixel_width) / 2;
-        let screen_offset_y = (self.screen_height - grid_pixel_height) / 2;
+        //let grid_pixel_width = self.grid_width_pixels; // (self.grid_width_pixels * self.grid.cell_size as i32);
+        //let grid_pixel_height = self.grid_height_pixels; //(self.grid_height_pixels * self.grid.cell_size as i32);
+        //let screen_offset_x = (self.screen_width - grid_pixel_width) / 2;
+        //let screen_offset_y = (self.screen_height - grid_pixel_height) / 2;
+
+        let screen_offset_x = self.screen_offset_x;
+        let screen_offset_y = self.screen_offset_y;
 
         for cell in &mut self.grid {
             let x = cell.x as i32;
@@ -269,12 +300,34 @@ impl World {
             };
 
             if self.show_pheromones {
+                if cell.to_home > 0.0 {
+                    let brightness = (((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 1.0);
+                    let color = PHEROMONE_FORAGING_COLOR.brightness(brightness);
+                    d.draw_circle(
+                        screen_offset_x + (x * cell_size + cell_size / 2),
+                        screen_offset_y + (y * cell_size + cell_size / 2),
+                        cell_size as f32 / 4.0,
+                        color,
+                    );
+                }
+                if cell.to_food > 0.0 {
+                    let brightness = ((cell.to_food / MAX_RGBA_VALUE) * 2.0) - 1.0;
+                    let color = PHEROMONE_RETURNING_FOOD_COLOR.brightness(brightness);
+                    d.draw_circle(
+                        screen_offset_x + (x * cell_size + cell_size / 2),
+                        screen_offset_y + (y * cell_size + cell_size / 2),
+                        cell_size as f32 / 4.0,
+                        color,
+                    );
+                }
+
+                /*
                 // If there is searching pheromone here, render it
                 if cell.to_home > 0.0 {
                     let mut color = PHEROMONE_FORAGING_COLOR;
-                    let intensity = cell.to_home / PHEROMONE_LIFETIME_SECONDS;
-                    let alpha = f32::sqrt(intensity) * MAX_RGBA_VALUE;
-                    //let alpha = cell.to_home / PHEROMONE_LIFETIME_SECONDS;
+                    //let intensity = cell.to_home / PHEROMONE_LIFETIME_SECONDS;
+                    //let alpha = (f32::sqrt(intensity) * MAX_RGBA_VALUE) / 2.0;
+                    let alpha = cell.to_home / PHEROMONE_LIFETIME_SECONDS;
                     color.a = (alpha * MAX_RGBA_VALUE) as u8;
                     d.draw_circle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
@@ -286,10 +339,10 @@ impl World {
                 // If there is a return trail here, render it
                 if cell.to_food > 0.0 {
                     let mut color = PHEROMONE_RETURNING_FOOD_COLOR;
-                    let intensity = cell.to_food / PHEROMONE_LIFETIME_SECONDS;
-                    let alpha = f32::sqrt(intensity) * MAX_RGBA_VALUE;
-                    //let alpha = cell.to_food / PHEROMONE_LIFETIME_SECONDS;
-                    color.a = (alpha * MAX_RGBA_VALUE as f32) as u8;
+                    //let intensity = cell.to_food / PHEROMONE_LIFETIME_SECONDS;
+                    //let alpha = (f32::sqrt(intensity) * MAX_RGBA_VALUE) / 2.0;
+                    let alpha = cell.to_food / PHEROMONE_LIFETIME_SECONDS;
+                    color.a = (alpha * MAX_RGBA_VALUE) as u8;
                     d.draw_circle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
                         screen_offset_y + (y * cell_size + cell_size / 2),
@@ -297,6 +350,7 @@ impl World {
                         color,
                     );
                 }
+                */
             }
 
             if self.show_grid {
@@ -320,7 +374,7 @@ impl World {
 
         // FIRST : Draw ants
         for ant in &self.colony.ants {
-            ant.draw(d, screen_offset_x, screen_offset_y);
+            ant.draw(d, self.show_ant_sensors, screen_offset_x, screen_offset_y);
         }
         // SECOND : Draw colony
         self.colony.draw(d, screen_offset_x, screen_offset_y);
