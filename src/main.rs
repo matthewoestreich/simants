@@ -34,7 +34,7 @@ fn main() {
 
     let colony = AntColony::new_with_immediate_spawn(
         NUM_ANTS,
-        5.0 * CELL_SIZE as f32,
+        COLONY_RADIUS * CELL_SIZE as f32,
         Vector2::new(colony_position_x, colony_position_y),
     );
 
@@ -45,12 +45,23 @@ fn main() {
         GRID_HEIGHT,
         CELL_SIZE,
         colony,
+        SHOW_GRID_LINES,
+        SHOW_PHEROMONES,
+        SHOW_BORDER,
     );
 
     while !rl.window_should_close() {
         // delta time can range from ~0.01 - 0.0008..
         // USUALLY it is around 0.0008
         world.update(rl.get_frame_time());
+
+        if rl.is_key_pressed(KeyboardKey::KEY_P) {
+            world.toggle_show_pheromones();
+        } else if rl.is_key_pressed(KeyboardKey::KEY_B) {
+            world.toggle_show_border();
+        } else if rl.is_key_pressed(KeyboardKey::KEY_G) {
+            world.toggle_show_grid();
+        }
 
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             let click_position = rl.get_mouse_position();
@@ -72,6 +83,7 @@ fn main() {
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
+        d.begin_blend_mode(BlendMode::BLEND_ADDITIVE);
         world.draw(&mut d);
     }
 }

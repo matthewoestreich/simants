@@ -9,6 +9,17 @@ pub struct World {
     pub screen_offset_y: i32,
     pub colony: AntColony,
     pub grid: Grid,
+
+    pub show_grid: bool,
+    pub show_pheromones: bool,
+    pub show_border: bool,
+}
+
+pub fn is_same_position(position: Vector2, other_position: Vector2, cell_size: u32) -> bool {
+    let half_size = cell_size as f32 / 2.0;
+    let dx = (other_position.x - position.x).abs();
+    let dy = (other_position.y - position.y).abs();
+    dx <= half_size && dy <= half_size
 }
 
 impl World {
@@ -19,6 +30,9 @@ impl World {
         grid_height: u32,
         cell_size: u32,
         colony: AntColony,
+        show_grid: bool,
+        show_pheromones: bool,
+        show_border: bool,
     ) -> Self {
         // Calculate screen position to grid cell offset (needed to map a screen position to a cell)
         let screen_offset_x = (screen_width - grid_width as i32) / 2;
@@ -39,7 +53,7 @@ impl World {
         // For drawing food clump
         let food_center_x = (cols * 3) / 4;
         let food_center_y = rows / 2;
-        let food_radius = 6; // Radius measured in number of grid cells
+        let food_radius = FOOD_RADIUS; // Radius measured in number of grid cells
 
         let mut grid = Grid::new(cols, rows, cell_size);
         let cell_size_f32 = cell_size as f32;
@@ -64,7 +78,7 @@ impl World {
             // Marks a cell as food.
             let food_dx = x as i32 - food_center_x as i32;
             let food_dy = y as i32 - food_center_y as i32;
-            if food_dx * food_dx + food_dy * food_dy <= food_radius * food_radius {
+            if food_dx * food_dx + food_dy * food_dy <= food_radius as i32 * food_radius as i32 {
                 cell.terrain = Terrain::Food;
                 cell.food = Some(100.0);
                 continue;
@@ -92,9 +106,22 @@ impl World {
             screen_offset_y,
             grid,
             colony,
-            //screen_offset_x,
-            //screen_offset_y,
+            show_grid,
+            show_pheromones,
+            show_border,
         }
+    }
+
+    pub fn toggle_show_border(&mut self) {
+        self.show_border = !self.show_border;
+    }
+
+    pub fn toggle_show_pheromones(&mut self) {
+        self.show_pheromones = !self.show_pheromones;
+    }
+
+    pub fn toggle_show_grid(&mut self) {
+        self.show_grid = !self.show_grid;
     }
 
     pub fn update(&mut self, delta_time: f32) {
@@ -103,9 +130,16 @@ impl World {
             cell.to_home = (cell.to_home - delta_time).max(0.0);
         }
 
-        for ant in self.colony.ants.iter_mut() {
+        let colony_center = self.colony.position;
+
+        for ant in &mut self.colony.ants {
+            if ant.is_out_of_energy() {
+                continue;
+            }
+
             ant.handle_pause(delta_time);
-            if ant.is_paused() || ant.is_out_of_energy() {
+
+            if ant.is_paused() {
                 continue;
             }
 
@@ -119,19 +153,28 @@ impl World {
             }
 
             if ant.is_returning_food() && current_cell.is_colony() {
+                if !is_same_position(colony_center, ant.position, self.grid.cell_size) {
+                    ant.steer_towards_position(colony_center, delta_time);
+                    continue;
+                }
                 ant.deliver_food();
                 ant.set_energy(ANT_MAX_ENERGY);
+                ant.turn_around();
                 continue;
             }
 
             if current_cell.allows_pheromones() {
-                let ant_pheromone_strength = ant.get_energy() / ANT_PHEROMONE_STRENGTH_DECAY;
-                ant.place_pheromone(current_cell, ant_pheromone_strength);
+                let drop_strength = PHEROMONE_LIFETIME_SECONDS * ant.get_energy();
+                ant.place_pheromone(current_cell, drop_strength);
                 let energy_loss_amount = delta_time * ANT_PHEROMONE_STRENGTH_DECAY;
                 ant.lose_energy(energy_loss_amount);
             }
 
             if let Some(next_position) = ant.calculate_next_position(current_cell, delta_time) {
+                if self.grid.position_is_obstruction(next_position) {
+                    ant.turn_around();
+                    continue;
+                }
                 ant.position = next_position;
             }
         }
@@ -192,7 +235,7 @@ impl World {
                     );
                 }
                 Terrain::Border => {
-                    if SHOW_BORDER {
+                    if self.show_border {
                         d.draw_rectangle(
                             screen_offset_x + (x * cell_size),
                             screen_offset_y + (y * cell_size),
@@ -225,13 +268,14 @@ impl World {
                 Terrain::Invalid => unreachable!("we should never try to draw an invalid cell"),
             };
 
-            if SHOW_PHEROMONES {
+            if self.show_pheromones {
                 // If there is searching pheromone here, render it
                 if cell.to_home > 0.0 {
                     let mut color = PHEROMONE_FORAGING_COLOR;
                     let intensity = cell.to_home / PHEROMONE_LIFETIME_SECONDS;
                     let alpha = f32::sqrt(intensity) * MAX_RGBA_VALUE;
-                    color.a = alpha as u8;
+                    //let alpha = cell.to_home / PHEROMONE_LIFETIME_SECONDS;
+                    color.a = (alpha * MAX_RGBA_VALUE) as u8;
                     d.draw_circle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
                         screen_offset_y + (y * cell_size + cell_size / 2),
@@ -242,7 +286,9 @@ impl World {
                 // If there is a return trail here, render it
                 if cell.to_food > 0.0 {
                     let mut color = PHEROMONE_RETURNING_FOOD_COLOR;
-                    let alpha = cell.to_food / ANT_PHEROMONE_STRENGTH_DECAY;
+                    let intensity = cell.to_food / PHEROMONE_LIFETIME_SECONDS;
+                    let alpha = f32::sqrt(intensity) * MAX_RGBA_VALUE;
+                    //let alpha = cell.to_food / PHEROMONE_LIFETIME_SECONDS;
                     color.a = (alpha * MAX_RGBA_VALUE as f32) as u8;
                     d.draw_circle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
@@ -253,7 +299,7 @@ impl World {
                 }
             }
 
-            if SHOW_GRID_LINES {
+            if self.show_grid {
                 if cell.is_border() {
                     continue;
                 }
@@ -278,71 +324,6 @@ impl World {
         }
         // SECOND : Draw colony
         self.colony.draw(d, screen_offset_x, screen_offset_y);
-    }
-
-    /// Returns a list of cell coordinates that lie inside the ant's forward vision cone.
-    pub fn get_coords_of_cells_in_cone(
-        &mut self,
-        ant: &Ant,
-        max_dist: f32,
-        view_angle: f32,
-    ) -> Vec<(i32, i32)> {
-        let mut visible_cells = Vec::new();
-
-        let cell_size_f32 = self.grid.cell_size as f32;
-        let cell_size_i32 = self.grid.cell_size as i32;
-        let grid_width_i32 = self.grid.cols as i32;
-        let grid_height_i32 = self.grid.rows as i32;
-
-        // 1. Calculate a tight bounding box around the ant's vision area
-        let min_x = ((ant.position.x - max_dist) / cell_size_f32).floor() as i32;
-        let max_x = ((ant.position.x + max_dist) / cell_size_f32).ceil() as i32;
-        let min_y = ((ant.position.y - max_dist) / cell_size_f32).floor() as i32;
-        let max_y = ((ant.position.y + max_dist) / cell_size_f32).ceil() as i32;
-
-        // Clamp bounding box dimensions to absolute grid array dimensions
-        let start_x = min_x.clamp(0, grid_width_i32 - 1);
-        let end_x = max_x.clamp(0, grid_width_i32 - 1);
-        let start_y = min_y.clamp(0, grid_height_i32 - 1);
-        let end_y = max_y.clamp(0, grid_height_i32 - 1);
-
-        // 2. Loop through only the cells inside this tiny local square box
-        for y in start_y..=end_y {
-            for x in start_x..=end_x {
-                // Calculate world-space center point of this specific tile
-                let cell_world_pos = Vector2::new(
-                    (x * cell_size_i32) as f32 + (cell_size_f32 / 2.0),
-                    (y * cell_size_i32) as f32 + (cell_size_f32 / 2.0),
-                );
-
-                // Check A: Distance Check
-                let to_cell = cell_world_pos - ant.position;
-                let dist_sqr = to_cell.length_sqr();
-                if dist_sqr > max_dist * max_dist {
-                    continue; // Too far away!
-                }
-
-                // Check B: Angular Vision Check
-                // Calculate the angular difference between the ant's face and this tile
-                let forward = ant.velocity.normalize();
-                let current_heading_angle = forward.y.atan2(forward.x);
-                let cell_direction_angle = to_cell.y.atan2(to_cell.x);
-                let mut angle_diff = (cell_direction_angle - current_heading_angle).abs();
-
-                // Keep angle difference normalized between 0 and PI
-                if angle_diff > std::f32::consts::PI {
-                    angle_diff = (2.0 * std::f32::consts::PI) - angle_diff;
-                }
-
-                // If the tile falls within our left/right view window, it's inside the cone!
-                if angle_diff <= view_angle {
-                    // Fetch cell index using your existing method
-                    visible_cells.push((x, y));
-                }
-            }
-        }
-
-        visible_cells
     }
 
     pub fn get_cell(&self, x: u32, y: u32) -> Option<&Cell> {

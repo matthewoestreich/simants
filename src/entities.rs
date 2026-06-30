@@ -1,11 +1,20 @@
 use crate::*;
 
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Food {
-    pub pos_x: i32,
-    pub pos_y: i32,
-    pub amount: i32,
-    pub is_harvested: bool,
+    pub amount: f32,
+}
+
+impl Default for Food {
+    fn default() -> Self {
+        Self { amount: FOOD_MAX }
+    }
+}
+
+impl Food {
+    pub fn new(amount: f32) -> Self {
+        Self { amount }
+    }
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
