@@ -1,12 +1,14 @@
 mod ant;
+mod entities;
+mod grid;
 mod settings;
 mod world;
-mod world_entities;
 
 pub(crate) use ant::*;
+pub(crate) use entities::*;
+pub(crate) use grid::*;
 pub(crate) use raylib::prelude::*;
 pub(crate) use settings::*;
-pub(crate) use world_entities::*;
 
 use crate::world::World;
 
@@ -21,6 +23,7 @@ fn main() {
     }
 
     let (mut rl, thread) = rl_builder.build();
+    rl.set_target_fps(60);
 
     let screen_width = rl.get_screen_width();
     let screen_height = rl.get_screen_height();
@@ -31,7 +34,7 @@ fn main() {
 
     let colony = AntColony::new_with_immediate_spawn(
         NUM_ANTS,
-        5.0 * CELL_SIZE as f32,
+        COLONY_RADIUS * CELL_SIZE as f32,
         Vector2::new(colony_position_x, colony_position_y),
     );
 
@@ -42,22 +45,45 @@ fn main() {
         GRID_HEIGHT,
         CELL_SIZE,
         colony,
+        SHOW_GRID_LINES,
+        SHOW_PHEROMONES,
+        SHOW_BORDER,
     );
 
     while !rl.window_should_close() {
+        // delta time can range from ~0.01 - 0.0008..
+        // USUALLY it is around 0.0008
+        world.update(rl.get_frame_time());
+
+        if rl.is_key_pressed(KeyboardKey::KEY_P) {
+            world.toggle_show_pheromones();
+        } else if rl.is_key_pressed(KeyboardKey::KEY_B) {
+            world.toggle_show_border();
+        } else if rl.is_key_pressed(KeyboardKey::KEY_G) {
+            world.toggle_show_grid();
+        }
+
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             let click_position = rl.get_mouse_position();
-
-            if let Some((x, y)) = world.grid.screen_to_grid_coords(click_position)
-                && let Some(cell) = world.grid.get(x, y)
+            if let Some(ant) = world.colony.ants.iter().find(|ant| {
+                ant.is_clicked(
+                    click_position,
+                    12.0f32,
+                    world.screen_offset_x,
+                    world.screen_offset_y,
+                )
+            }) {
+                println!("{ant}");
+            } else if let Some((x, y)) = world.screen_to_grid_coords(click_position)
+                && let Some(cell) = world.get_cell(x, y)
             {
                 println!("{cell:?}");
             }
         }
 
-        world.update(rl.get_frame_time());
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
+        d.begin_blend_mode(BlendMode::BLEND_ADDITIVE);
         world.draw(&mut d);
     }
 }
