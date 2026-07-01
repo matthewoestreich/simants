@@ -148,61 +148,56 @@ impl World {
 
     pub fn update(&mut self, delta_time: f32) {
         for cell in self.grid.iter_mut() {
-            if cell.is_food() && cell.food <= 0.0 {
-                cell.terrain = Terrain::Empty;
-                continue;
+            match cell.terrain {
+                Terrain::Food if cell.food <= 0.0 => cell.terrain = Terrain::Empty,
+                Terrain::Empty => cell.evaporate(delta_time, PHEROMONE_DECAY_RATE),
+                _ => {}
             }
-            if cell.is_colony() || cell.is_obstruction() {
-                continue;
-            }
-            cell.evaporate(delta_time, PHEROMONE_DECAY_RATE);
         }
 
         let colony_center = self.colony.position;
 
         for ant in &mut self.colony.ants {
             ant.handle_pause(delta_time);
-
             if ant.is_paused() {
                 continue;
             }
 
             let current_cell = ant.sense_environment(&mut self.grid);
 
+            // Gather food
             if ant.is_foraging() && current_cell.is_food() {
+                // TODO : clean this up
                 let harvested_amount = ant.harvest(current_cell.food);
                 current_cell.food = (current_cell.food - harvested_amount).max(0.0);
-                self.colony.harvested_food += harvested_amount;
                 ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
-                //ant.turn_around();
                 ant.turn_in_any_direction();
                 continue;
             }
 
+            // Deliver food to colony
             if ant.is_returning_food() && current_cell.is_colony() {
                 if is_same_position(colony_center, ant.position, self.grid.cell_size) {
-                    ant.deliver_food();
+                    self.colony.harvested_food += ant.deliver_food();
                     ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                     ant.turn_in_any_direction();
-                    continue;
+                } else {
+                    ant.steer_towards_position(colony_center, delta_time);
                 }
-                ant.steer_towards_position(colony_center, delta_time);
                 continue;
             }
 
+            // Place pheromone
             if !ant.is_out_of_pheromones() && current_cell.allows_pheromones() {
-                let remaining_pheromones = ant.get_pheromones_remaining();
-                let drop_strength = World::calculate_decayed_amount(
-                    remaining_pheromones,
-                    delta_time,
-                    ANT_PHEROMONE_LOSS_RATE,
-                );
-                ant.place_pheromone(current_cell, drop_strength);
-                let pheromone_loss =
-                    (remaining_pheromones - drop_strength) * ANT_PHEROMONE_LOSS_RATE;
-                ant.lose_pheromones(pheromone_loss);
+                let loss_rate = ANT_PHEROMONE_LOSS_RATE;
+                let remaining = ant.get_pheromones_remaining();
+                let strength = World::calculate_decayed_amount(remaining, delta_time, loss_rate);
+                let lost = (remaining - strength) * loss_rate;
+                ant.place_pheromone(current_cell, strength);
+                ant.lose_pheromones(lost);
             }
 
+            // Handle movement
             if let Some(next_position) = ant.calculate_next_position(delta_time) {
                 if self.grid.position_is_obstruction(next_position) {
                     ant.turn_around();

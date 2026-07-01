@@ -51,9 +51,9 @@ fn main() {
         SHOW_ANTS,
     );
 
-    while !rl.window_should_close() {
-        world.update(rl.get_frame_time());
+    let mut is_paused = false;
 
+    while !rl.window_should_close() {
         if rl.is_key_pressed(KeyboardKey::KEY_A) {
             world.toggle_show_ants();
         } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
@@ -64,6 +64,12 @@ fn main() {
             world.toggle_show_grid();
         } else if rl.is_key_pressed(KeyboardKey::KEY_S) {
             world.toggle_show_ant_sensors();
+        } else if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {
+            is_paused = !is_paused;
+        }
+
+        if !is_paused {
+            world.update(rl.get_frame_time());
         }
 
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {

@@ -257,10 +257,13 @@ impl Ant {
         amount
     }
 
-    pub fn deliver_food(&mut self) {
-        self.total_food_harvested += self.food;
+    // Returns amount delivered..
+    pub fn deliver_food(&mut self) -> f32 {
+        let delivered = self.food;
+        self.total_food_harvested += delivered;
         self.food = 0.0;
         self.state = AntState::Foraging;
+        delivered
     }
 
     pub fn steer_towards_position(&mut self, target: Vector2, delta_time: f32) {
