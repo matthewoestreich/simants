@@ -372,9 +372,9 @@ impl Ant {
     }
 
     pub fn draw(&self, d: &mut RaylibDrawHandle, draw_sensors: bool, offset_x: i32, offset_y: i32) {
-        let color = match self.state {
-            AntState::Foraging => ANT_FORAGING_COLOR,
-            AntState::ReturningFood => ANT_RETURNING_FOOD_COLOR,
+        let (ant_color, mut sensor_color) = match self.state {
+            AntState::Foraging => (ANT_FORAGING_COLOR, FOOD_COLOR),
+            AntState::ReturningFood => (ANT_RETURNING_FOOD_COLOR, COLONY_COLOR),
         };
 
         let forward = self.velocity.normalize();
@@ -390,25 +390,21 @@ impl Ant {
         let spear = position + (forward * (ant_length / 2.0));
         let left_back = position - (forward * (ant_length / 2.0)) - (right * (ant_width / 2.0));
         let right_back = position - (forward * (ant_length / 2.0)) + (right * (ant_width / 2.0));
-        d.draw_triangle(spear, left_back, right_back, color);
+        d.draw_triangle(spear, left_back, right_back, ant_color);
 
         if draw_sensors && let Some((l, c, r)) = self.sensors {
-            let mut color = match self.state {
-                AntState::Foraging => FOOD_COLOR,
-                AntState::ReturningFood => COLONY_COLOR,
-            };
-            color.a = 150;
+            sensor_color.a = 150;
             let screen_left_sensor = Vector2::new(ox + l.x, oy + l.y);
             let screen_center_sensor = Vector2::new(ox + c.x, oy + c.y);
             let screen_right_sensor = Vector2::new(ox + r.x, oy + r.y);
             // Draw sensor 'whiskers'
-            d.draw_line_v(position, screen_left_sensor, color);
-            d.draw_line_v(position, screen_center_sensor, color);
-            d.draw_line_v(position, screen_right_sensor, color);
-            let s = Vector2::new(2.0, 2.0);
-            d.draw_rectangle_v(screen_left_sensor, s, color);
-            d.draw_rectangle_v(screen_center_sensor, s, color);
-            d.draw_rectangle_v(screen_right_sensor, s, color);
+            d.draw_line_v(position, screen_left_sensor, sensor_color);
+            d.draw_line_v(position, screen_center_sensor, sensor_color);
+            d.draw_line_v(position, screen_right_sensor, sensor_color);
+            let size = Vector2::new(2.0, 2.0);
+            d.draw_rectangle_v(screen_left_sensor, size, sensor_color);
+            d.draw_rectangle_v(screen_center_sensor, size, sensor_color);
+            d.draw_rectangle_v(screen_right_sensor, size, sensor_color);
         }
     }
 }
