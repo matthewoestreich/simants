@@ -3,12 +3,14 @@
 Ant simulation in Rust with Raylib
 
 <p align="center">
-  <img width="32%" alt="ants" src="https://github.com/user-attachments/assets/23cfd914-821a-4289-a72b-be5fb104080f" />
-  <img width="32%" alt="ants_pheromones" src="https://github.com/user-attachments/assets/bf1856a9-61a0-4f99-9de4-3396561e9321" />
+  <img width="32%" height="10%" alt="ants" src="https://github.com/user-attachments/assets/23cfd914-821a-4289-a72b-be5fb104080f" />
+  <img width="32%" height="10%" alt="ants_pheromones" src="https://github.com/user-attachments/assets/bf1856a9-61a0-4f99-9de4-3396561e9321" />
+  <img width="32%" height="10%" alt="ants_pheromones_grid_border" src="https://github.com/user-attachments/assets/de25945f-fcc0-475d-8f52-69fceed7490b" />
 </p>
 <p align="center">
-  <img width="32%" alt="ants_pheromones_grid_border" src="https://github.com/user-attachments/assets/de25945f-fcc0-475d-8f52-69fceed7490b" />
-  <img width="32%" alt="pheromones" src="https://github.com/user-attachments/assets/10806f94-6571-42bb-8b15-f10ab05c9369" />
+  <img width="32%" height="10% alt="pheromones" src="https://github.com/user-attachments/assets/10806f94-6571-42bb-8b15-f10ab05c9369" />
+  <img width="32%" height="10%" height="827" alt="ants_sensors" src="https://github.com/user-attachments/assets/9084ccc9-f0dc-4baa-8bf8-fb6820a835ba" />
+  <img width="32%" height="10%" alt="Screenshot 2026-06-30 at 8 17 50 PM" src="https://github.com/user-attachments/assets/04c81459-bcaa-4807-86a6-9aed457cc3cd" />
 </p>
 
 # Behavior
