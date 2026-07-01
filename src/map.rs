@@ -78,7 +78,6 @@ impl Grid {
         ant_state: AntState,
     ) -> CellSample {
         let mut this = self.sample_position(position);
-
         if this.terrain.is_invalid() {
             return this;
         }
@@ -86,19 +85,16 @@ impl Grid {
         match ant_state {
             AntState::Foraging => {
                 this.pheromone_bias = this.to_food_strength;
-
                 if this.terrain.is_food() {
                     this.pheromone_bias += 1000.0;
                 }
             }
             AntState::ReturningFood => {
                 this.pheromone_bias = this.to_home_strength;
-
                 if this.terrain.is_colony() {
                     this.pheromone_bias += 1000.0;
                 }
             }
-            AntState::Paused { .. } => {}
         };
 
         this

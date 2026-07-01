@@ -198,7 +198,7 @@ impl World {
                 ant.lose_pheromones(delta_time * ANT_PHEROMONE_LOSS_RATE);
             }
 
-            if let Some(next_position) = ant.calculate_next_position(current_cell, delta_time) {
+            if let Some(next_position) = ant.calculate_next_position(delta_time) {
                 if self.grid.position_is_obstruction(next_position) {
                     ant.turn_around();
                     continue;
