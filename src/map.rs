@@ -210,10 +210,8 @@ impl Cell {
     /// Exponentially decreases the trail strength over time.
     /// `decay_rate` controls the speed of the fade (e.g., 0.1 means 10% loss per second).
     pub fn evaporate(&mut self, delta_time: f32, decay_rate: f32) {
-        let evap_to_food = World::calculate_decayed_amount(self.to_food, delta_time, decay_rate);
-        self.to_food = evap_to_food;
-        let evap_to_home = World::calculate_decayed_amount(self.to_home, delta_time, decay_rate);
-        self.to_home = evap_to_home;
+        self.to_food = World::calculate_decayed_amount(self.to_food, delta_time, decay_rate);
+        self.to_home = World::calculate_decayed_amount(self.to_home, delta_time, decay_rate);
     }
 
     pub fn is_colony(&self) -> bool {

@@ -80,9 +80,9 @@ impl World {
             // Marks a cell as an obstacle.
             // This obstacle will eventually be drawn as a vertical line that is centerted horizontally and vertically
             if x_range.contains(&x) && y_range.contains(&y) {
-                if y % 20 <= 3 {
-                    continue;
-                }
+                //if y % 20 <= 3 {
+                //    continue;
+                //}
                 cell.terrain = Terrain::Obstacle;
                 continue;
             }
@@ -170,7 +170,9 @@ impl World {
             let current_cell = ant.sense_environment(&mut self.grid);
 
             if ant.is_foraging() && current_cell.is_food() {
-                ant.harvest(current_cell);
+                let harvested_amount = ant.harvest(current_cell.food);
+                current_cell.food = (current_cell.food - harvested_amount).max(0.0);
+                self.colony.harvested_food += harvested_amount;
                 ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                 //ant.turn_around();
                 ant.turn_in_any_direction();
@@ -189,13 +191,16 @@ impl World {
             }
 
             if !ant.is_out_of_pheromones() && current_cell.allows_pheromones() {
+                let remaining_pheromones = ant.get_pheromones_remaining();
                 let drop_strength = World::calculate_decayed_amount(
-                    ANT_PHEROMONE_MULTIPLIER * ant.get_pheromones_remaining(),
+                    remaining_pheromones,
                     delta_time,
                     ANT_PHEROMONE_LOSS_RATE,
                 );
                 ant.place_pheromone(current_cell, drop_strength);
-                ant.lose_pheromones(delta_time * ANT_PHEROMONE_LOSS_RATE);
+                let pheromone_loss =
+                    (remaining_pheromones - drop_strength) * ANT_PHEROMONE_LOSS_RATE;
+                ant.lose_pheromones(pheromone_loss);
             }
 
             if let Some(next_position) = ant.calculate_next_position(delta_time) {
@@ -212,10 +217,8 @@ impl World {
         if strength <= 0.0 {
             return 0.0;
         }
-
         let factor = f32::exp(-decay_rate * delta_time);
         let amount = strength * factor;
-
         if amount < 0.1 {
             return 0.0;
         }
@@ -223,8 +226,8 @@ impl World {
     }
 
     pub fn screen_to_grid_coords(&self, position: Vector2) -> Option<(u32, u32)> {
-        let offset_x = self.screen_offset_x; // (self.screen_width as u32 - self.grid_width_pixels as u32) / 2;
-        let offset_y = self.screen_offset_y; // (self.screen_height as u32 - self.grid_height_pixels as u32) / 2;
+        let offset_x = self.screen_offset_x;
+        let offset_y = self.screen_offset_y;
 
         let local_x = position.x - offset_x as f32;
         let local_y = position.y - offset_y as f32;
@@ -244,12 +247,6 @@ impl World {
 
     pub fn draw(&mut self, d: &mut RaylibDrawHandle) {
         let cell_size = self.grid.cell_size as i32;
-
-        //let grid_pixel_width = self.grid_width_pixels; // (self.grid_width_pixels * self.grid.cell_size as i32);
-        //let grid_pixel_height = self.grid_height_pixels; //(self.grid_height_pixels * self.grid.cell_size as i32);
-        //let screen_offset_x = (self.screen_width - grid_pixel_width) / 2;
-        //let screen_offset_y = (self.screen_height - grid_pixel_height) / 2;
-
         let screen_offset_x = self.screen_offset_x;
         let screen_offset_y = self.screen_offset_y;
 
@@ -284,7 +281,7 @@ impl World {
                         screen_offset_y + (y * cell_size),
                         cell_size,
                         cell_size,
-                        Color::GOLD,
+                        FOOD_COLOR,
                     );
                 }
                 Terrain::Empty | Terrain::Colony => {
@@ -304,21 +301,23 @@ impl World {
             if self.show_pheromones {
                 if cell.to_home > 0.0 {
                     let brightness = ((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 1.0;
-                    let color = PHEROMONE_FORAGING_COLOR.brightness(brightness);
-                    d.draw_circle(
+                    let color = PHEROMONE_FORAGING_COLOR.brightness(brightness + 0.2);
+                    d.draw_rectangle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
                         screen_offset_y + (y * cell_size + cell_size / 2),
-                        cell_size as f32 / 4.0,
+                        cell_size,
+                        cell_size,
                         color,
                     );
                 }
                 if cell.to_food > 0.0 {
                     let brightness = ((cell.to_food / MAX_RGBA_VALUE) * 2.0) - 1.0;
-                    let color = PHEROMONE_RETURNING_FOOD_COLOR.brightness(brightness);
-                    d.draw_circle(
+                    let color = PHEROMONE_RETURNING_FOOD_COLOR.brightness(brightness + 0.2);
+                    d.draw_rectangle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
                         screen_offset_y + (y * cell_size + cell_size / 2),
-                        cell_size as f32 / 4.0,
+                        cell_size,
+                        cell_size,
                         color,
                     );
                 }
@@ -328,17 +327,14 @@ impl World {
                 if cell.is_border() {
                     continue;
                 }
-
                 let thickness = 0.5;
                 let line_color = Color::new(80, 80, 80, 255);
-
                 let rect = Rectangle::new(
                     (screen_offset_x + (x * cell_size)) as f32,
                     (screen_offset_y + (y * cell_size)) as f32,
                     cell_size as f32,
                     cell_size as f32,
                 );
-
                 d.draw_rectangle_lines_ex(rect, thickness, line_color);
             }
         }
@@ -370,5 +366,130 @@ impl World {
     #[allow(dead_code)]
     pub fn get_cell_mut_from_position(&mut self, position: Vector2) -> Option<&mut Cell> {
         self.grid.get_cell_mut_from_position(position)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_exponential_pheromone_decay() {
+        let initial_strength = 100.0;
+        let decay_rate = 0.5;
+        let delta_time = 2.0;
+
+        let mut cell = Cell {
+            to_food: initial_strength,
+            to_home: initial_strength,
+            terrain: Terrain::Empty,
+            food: 1.0,
+            x: 5,
+            y: 5,
+        };
+
+        cell.evaporate(delta_time, decay_rate);
+        let expected_factor = (-decay_rate * delta_time).exp();
+        let expected_strength = initial_strength * expected_factor;
+
+        println!(
+            "cell.to_food= {} | expected_strength= {expected_strength}",
+            cell.to_food
+        );
+
+        //let epsilon = f32::EPSILON * 100.0; // Small tolerance threshold
+        assert!(
+            //(cell.to_food - expected_strength).abs() < epsilon,
+            cell.to_food - expected_strength == 0.0,
+            "Expected {}, got {}",
+            expected_strength,
+            cell.to_food
+        );
+        assert!(
+            //(cell.to_home - expected_strength).abs() < epsilon,
+            cell.to_home - expected_strength == 0.0,
+            "Expected {}, got {}",
+            expected_strength,
+            cell.to_home
+        );
+    }
+
+    #[test]
+    fn test_time_step_independence() {
+        let initial_strength = 50.0;
+        let decay_rate = 0.3;
+
+        let mut cell_single_step = Cell {
+            to_food: initial_strength,
+            to_home: initial_strength,
+            terrain: Terrain::Empty,
+            food: 1.0,
+            x: 5,
+            y: 5,
+        };
+
+        let single_step_delta_time = 2.0;
+        // Process 2.0 seconds in one frame
+        cell_single_step.evaporate(single_step_delta_time, decay_rate);
+        let single_expected_factor = (-decay_rate * single_step_delta_time).exp();
+        let single_expected_strength = initial_strength * single_expected_factor;
+
+        assert!(
+            cell_single_step.to_food - single_expected_strength == 0.0,
+            "Single Expected {}, got {}",
+            single_expected_strength,
+            cell_single_step.to_food
+        );
+        assert!(
+            cell_single_step.to_home - single_expected_strength == 0.0,
+            "Single Expected {}, got {}",
+            single_expected_strength,
+            cell_single_step.to_home
+        );
+
+        // MULTI STEP
+
+        let mut cell_multi_step = Cell {
+            to_food: initial_strength,
+            to_home: initial_strength,
+            terrain: Terrain::Empty,
+            food: 1.0,
+            x: 5,
+            y: 5,
+        };
+
+        let multi_step_delta_time = 1.0;
+        let num_multi_step_steps = 2;
+        let mut multi_expected_strength = initial_strength;
+
+        for _ in 0..num_multi_step_steps {
+            cell_multi_step.evaporate(multi_step_delta_time, decay_rate);
+            let step_factor = (-decay_rate * multi_step_delta_time).exp();
+            multi_expected_strength *= step_factor;
+        }
+
+        println!(
+            "sing_step= {{ to_food: {}, to_home: {} }} | multi_step= {{ to_food: {}, to_home: {} }}",
+            cell_single_step.to_food,
+            cell_single_step.to_home,
+            cell_multi_step.to_food,
+            cell_multi_step.to_home
+        );
+
+        assert!(
+            cell_multi_step.to_food - multi_expected_strength == 0.0,
+            "Multi Expected {}, got {}",
+            multi_expected_strength,
+            cell_multi_step.to_food
+        );
+        assert!(
+            cell_multi_step.to_home - multi_expected_strength == 0.0,
+            "Multi Expected {}, got {}",
+            multi_expected_strength,
+            cell_multi_step.to_home
+        );
+
+        // let epsilon = 1e-5;
+        //assert!((cell_single_step.to_food - cell_multi_step.to_food).abs() < epsilon);
     }
 }

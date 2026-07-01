@@ -19,6 +19,7 @@ pub struct AntColony {
     pub radius: f32,
     pub area: f32,
     pub position: Vector2,
+    pub harvested_food: f32,
 }
 
 impl AntColony {
@@ -28,6 +29,7 @@ impl AntColony {
             radius,
             area: radius * radius,
             ants: Vec::with_capacity(num_ants),
+            harvested_food: 0.0,
             position,
         }
     }
@@ -170,7 +172,7 @@ impl Ant {
             }
             // wander randomly
             else {
-                self.rng // Wander randomly
+                self.rng
                     .random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
                     .to_radians()
             }
@@ -235,21 +237,24 @@ impl Ant {
         Some(0.0f32)
     }
 
-    pub fn harvest(&mut self, from: &mut Cell) {
+    // Gets a random number from ANT_HARVEST_AMOUNT_RANGE and takes it from
+    // capacity_to_harvest_from, then returns amount harvested
+    pub fn harvest(&mut self, capacity_to_harvest_from: f32) -> f32 {
         let amount = self
             .rng
             .random_range(ANT_HARVEST_AMOUNT_RANGE)
-            .min(from.food);
-        self.harvest_amount(from, amount);
+            .min(capacity_to_harvest_from);
+        self.harvest_amount(amount)
     }
 
-    pub fn harvest_amount(&mut self, from: &mut Cell, amount: f32) {
-        if from.food <= 0.0 {
-            return;
+    // Attempts to harvest the exact amount provided. Returns amount harvested.
+    pub fn harvest_amount(&mut self, amount: f32) -> f32 {
+        if amount <= 0.0 {
+            return 0.0;
         }
-        from.food -= amount;
         self.food += amount;
         self.state = AntState::ReturningFood;
+        amount
     }
 
     pub fn deliver_food(&mut self) {
@@ -388,17 +393,22 @@ impl Ant {
         d.draw_triangle(spear, left_back, right_back, color);
 
         if draw_sensors && let Some((l, c, r)) = self.sensors {
-            let indicator_color = Color::PINK;
+            let mut color = match self.state {
+                AntState::Foraging => FOOD_COLOR,
+                AntState::ReturningFood => COLONY_COLOR,
+            };
+            color.a = 150;
             let screen_left_sensor = Vector2::new(ox + l.x, oy + l.y);
             let screen_center_sensor = Vector2::new(ox + c.x, oy + c.y);
             let screen_right_sensor = Vector2::new(ox + r.x, oy + r.y);
             // Draw sensor 'whiskers'
-            d.draw_line_v(position, screen_left_sensor, indicator_color);
-            d.draw_line_v(position, screen_center_sensor, indicator_color);
-            d.draw_line_v(position, screen_right_sensor, indicator_color);
-            d.draw_circle_v(screen_left_sensor, 1.5, indicator_color);
-            d.draw_circle_v(screen_center_sensor, 1.5, indicator_color);
-            d.draw_circle_v(screen_right_sensor, 1.5, indicator_color);
+            d.draw_line_v(position, screen_left_sensor, color);
+            d.draw_line_v(position, screen_center_sensor, color);
+            d.draw_line_v(position, screen_right_sensor, color);
+            let s = Vector2::new(2.0, 2.0);
+            d.draw_rectangle_v(screen_left_sensor, s, color);
+            d.draw_rectangle_v(screen_center_sensor, s, color);
+            d.draw_rectangle_v(screen_right_sensor, s, color);
         }
     }
 }

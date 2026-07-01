@@ -66,6 +66,9 @@ At a high level:
 
 # Hotkeys
 
+- **Left mouse click:** If clicked on an ant, prints ant info to terminal.
+- **Right mouse click:** If right click on map (even if an ant is right clicked) it prints info for the underlying cell to terminal.
+
 | Key | Action                        |
 | --- | ----------------------------- |
 | `a` | Toggles rendering ants        |

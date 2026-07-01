@@ -84,6 +84,12 @@ fn main() {
                 && let Some(cell) = world.get_cell(x, y)
             {
                 println!("{cell:?}");
+                if cell.is_colony() {
+                    println!(
+                        "Colony has harvested : '{}' food",
+                        world.colony.harvested_food
+                    );
+                }
             }
         }
 
