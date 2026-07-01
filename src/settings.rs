@@ -19,7 +19,7 @@ pub const ANT_MAX_PHEROMONE_CAPACITY: f32 = 200.0;
 pub const ANT_HARVEST_AMOUNT_RANGE: Range<f32> = 10.0..50.0;
 // How fast can an ant turn. The higher this value, the longer it will take an ant to face a
 // difffernt direction.
-pub const ANT_MAX_TURN_FORCE: f32 = 15.0;
+pub const ANT_MAX_TURN_FORCE: f32 = 22.0;
 // In radians
 pub const ANT_TURN_ANGLE: f32 = 35.0; //pub const ANT_TURN_ANGLE_RANGE: Range<f32> = -25.0..25.0;
 // When an ant is at an obstacle, we furst flip the current direction it is facingg, so we need to

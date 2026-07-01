@@ -1,4 +1,16 @@
-use crate::*;
+use crate::{
+    ant::AntColony,
+    map::{Cell, Grid, Terrain},
+    settings::{
+        ANT_MAX_PHEROMONE_CAPACITY, ANT_PHEROMONE_LOSS_RATE, BACKGROUND_COLOR,
+        FOOD_CELL_MAX_AMOUNT, FOOD_COLOR, FOOD_RADIUS, MAX_RGBA_VALUE, OBSTACLE_COLOR,
+        PHEROMONE_DECAY_RATE, PHEROMONE_FORAGING_COLOR, PHEROMONE_RETURNING_FOOD_COLOR,
+    },
+};
+use raylib::{
+    ffi::{Color, Rectangle, Vector2},
+    prelude::{RaylibDraw as _, RaylibDrawHandle},
+};
 
 pub struct World {
     #[allow(dead_code)]

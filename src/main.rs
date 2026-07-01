@@ -6,12 +6,20 @@ mod map;
 mod settings;
 mod world;
 
-pub(crate) use ant::*;
-pub(crate) use map::*;
-pub(crate) use raylib::prelude::*;
-pub(crate) use settings::*;
-
-use crate::world::World;
+use crate::{
+    ant::AntColony,
+    settings::{
+        BACKGROUND_COLOR, CELL_SIZE, COLONY_RADIUS, GRID_HEIGHT, GRID_WIDTH, NUM_ANTS,
+        SCREEN_HEIGHT, SCREEN_WIDTH, SHOW_ANT_SENSORS, SHOW_ANTS, SHOW_BORDER, SHOW_GRID_LINES,
+        SHOW_PHEROMONES, TITLE,
+    },
+    world::World,
+};
+use raylib::{
+    RaylibHandle,
+    ffi::{Camera2D, Color, KeyboardKey, MouseButton, Vector2},
+    prelude::{RaylibDraw as _, RaylibMode2DExt as _},
+};
 
 fn main() {
     assert!(

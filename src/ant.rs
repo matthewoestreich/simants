@@ -1,5 +1,22 @@
-use crate::*;
+use crate::{
+    map::{Cell, CellSample, Grid, Terrain},
+    settings::{
+        ANT_ACCELERATION_RATE, ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT, ANT_FORAGING_COLOR,
+        ANT_HARVEST_AMOUNT_RANGE, ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
+        ANT_OBSTACLE_PANIC_ANGLE_RANGE, ANT_PAUSE_FOR_RANGE_IN_SEC, ANT_PAUSE_PROBABILITY,
+        ANT_RETURNING_FOOD_COLOR, ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE, ANT_SIZE_MULTIPLIER,
+        ANT_SPEED_WOBBLE_PERCENT, ANT_TURN_ANGLE, CELL_SIZE, COLONY_COLOR, FOOD_COLOR,
+    },
+};
 use rand::RngExt as _;
+use raylib::{
+    ffi::Vector2,
+    prelude::{RaylibDraw as _, RaylibDrawHandle},
+};
+
+/* ---------------------------------------------------------------- */
+/* -------------- AntState ---------------------------------------- */
+/* ---------------------------------------------------------------- */
 
 #[derive(Default, Debug, Clone, Copy)]
 pub enum AntState {
