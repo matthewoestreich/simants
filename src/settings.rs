@@ -10,7 +10,7 @@ pub const NUM_ANTS: usize = 12_000;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
 pub const ANT_SIZE_MULTIPLIER: f32 = 1.0;
 // Pixels per second
-pub const ANT_MAX_SPEED: f32 = 40.0;
+pub const ANT_MAX_SPEED: f32 = 30.0; // 40.0 seems to be stable
 pub const ANT_SPEED_WOBBLE_PERCENT: f32 = 25.0;
 pub const ANT_ACCELERATION_RATE: f32 = 5.0;
 // Ants carrying food are naturally slower. If this value is 0.70, it will slow the ant down 30%
@@ -42,7 +42,7 @@ pub const ANT_SENSOR_ANGLE: f32 = 45.0; // In radians
 // This number will be multiplied by the cell size.
 pub const ANT_SENSOR_DISTANCE: u32 = 2;
 
-pub const PHEROMONE_DECAY_RATE: f32 = 0.01; // 0.005 seems to be stable
+pub const PHEROMONE_DECAY_RATE: f32 = 0.011; // 0.005 seems to be stable
 pub const FOOD_CELL_MAX_AMOUNT: f32 = 1_000_000.0;
 
 /* ----------------------------------- */
@@ -69,7 +69,7 @@ pub const SCREEN_HEIGHT: i32 = 800;
 pub const GRID_WIDTH: u32 = 1200;
 pub const GRID_HEIGHT: u32 = 800;
 // N x N pixels
-pub const CELL_SIZE: u32 = 8;
+pub const CELL_SIZE: u32 = 4;
 pub const MAX_RGBA_VALUE: f32 = 255.0;
 
 /* ----------------------------------- */
