@@ -1,44 +1,45 @@
+#![allow(clippy::assertions_on_constants)]
+
 mod ant;
-mod entities;
-mod grid;
+mod map;
 mod settings;
 mod world;
 
 pub(crate) use ant::*;
-pub(crate) use entities::*;
-pub(crate) use grid::*;
+pub(crate) use map::*;
 pub(crate) use raylib::prelude::*;
 pub(crate) use settings::*;
 
 use crate::world::World;
 
 fn main() {
-    let mut rl_builder = raylib::init();
-    rl_builder.title(TITLE);
+    assert!(
+        SCREEN_WIDTH > 0 && SCREEN_HEIGHT > 0,
+        "expected screen dimensions to be > 0 : SCREEN_WIDTH={SCREEN_WIDTH} | SCREEN_HEIGHT={SCREEN_HEIGHT}"
+    );
+    assert!(
+        GRID_WIDTH <= SCREEN_WIDTH as u32 && GRID_HEIGHT <= SCREEN_HEIGHT as u32,
+        "expected grid dimensions to be <= screen dimensions : GRID_WIDTH={GRID_WIDTH} | GRID_HEIGHT={GRID_HEIGHT} | SCREEN_WIDTH={SCREEN_WIDTH} | SCREEN_HEIGHT={SCREEN_HEIGHT}"
+    );
 
-    if SCREEN_WIDTH <= 0 || SCREEN_HEIGHT <= 0 {
-        rl_builder.fullscreen();
-    } else {
-        rl_builder.size(SCREEN_WIDTH, SCREEN_HEIGHT);
-    }
+    let (mut rl, thread) = raylib::init()
+        .title(TITLE)
+        .size(SCREEN_WIDTH, SCREEN_HEIGHT)
+        .build();
 
-    let (mut rl, thread) = rl_builder.build();
     rl.set_target_fps(60);
 
-    let screen_width = rl.get_screen_width();
-    let screen_height = rl.get_screen_height();
-    let colony_position_x = GRID_WIDTH as f32 / 8.0;
-    let colony_position_y = GRID_HEIGHT as f32 / 2.0;
+    let colony_position = Vector2::new(GRID_WIDTH as f32 / 8.0, GRID_HEIGHT as f32 / 2.0);
 
     let colony = AntColony::new_with_immediate_spawn(
         NUM_ANTS,
         COLONY_RADIUS * CELL_SIZE as f32,
-        Vector2::new(colony_position_x, colony_position_y),
+        colony_position,
     );
 
     let mut world = World::new(
-        screen_width,
-        screen_height,
+        rl.get_screen_width(),
+        rl.get_screen_height(),
         GRID_WIDTH,
         GRID_HEIGHT,
         CELL_SIZE,
@@ -50,26 +51,18 @@ fn main() {
         SHOW_ANTS,
     );
 
-    let show_ants_toggle_key = KeyboardKey::KEY_A;
-    let show_pheromones_toggle_key = KeyboardKey::KEY_P;
-    let show_border_toggle_key = KeyboardKey::KEY_B;
-    let show_grid_toggle_key = KeyboardKey::KEY_G;
-    let show_ant_sensors_toggle_key = KeyboardKey::KEY_S;
-
     while !rl.window_should_close() {
-        // delta time can range from ~0.01 - 0.0008..
-        // USUALLY it is around 0.0008
         world.update(rl.get_frame_time());
 
-        if rl.is_key_pressed(show_ants_toggle_key) {
+        if rl.is_key_pressed(KeyboardKey::KEY_A) {
             world.toggle_show_ants();
-        } else if rl.is_key_pressed(show_pheromones_toggle_key) {
+        } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
             world.toggle_show_pheromones();
-        } else if rl.is_key_pressed(show_border_toggle_key) {
+        } else if rl.is_key_pressed(KeyboardKey::KEY_B) {
             world.toggle_show_border();
-        } else if rl.is_key_pressed(show_grid_toggle_key) {
+        } else if rl.is_key_pressed(KeyboardKey::KEY_G) {
             world.toggle_show_grid();
-        } else if rl.is_key_pressed(show_ant_sensors_toggle_key) {
+        } else if rl.is_key_pressed(KeyboardKey::KEY_S) {
             world.toggle_show_ant_sensors();
         }
 

@@ -50,8 +50,7 @@ impl AntColony {
     }
 
     pub fn draw(&self, d: &mut RaylibDrawHandle, offset_x: i32, offset_y: i32) {
-        let mut color = COLONY_COLOR;
-        //color.a = 150; // Semi-transparent tint
+        let color = COLONY_COLOR;
         let ox = offset_x as f32;
         let oy = offset_y as f32;
         let position_with_offset = Vector2::new(ox + self.position.x, oy + self.position.y);
@@ -101,8 +100,6 @@ pub struct Ant {
     sensors: Option<(Vector2, Vector2, Vector2)>,
     sensor_samples: SensorSamples,
     rng: rand::rngs::ThreadRng,
-
-    draw_sensors: bool,
 }
 
 impl Ant {
@@ -342,6 +339,7 @@ impl Ant {
         self.pheromone_tank = (self.pheromone_tank - value).max(0.0);
     }
 
+    #[allow(dead_code)]
     pub fn add_pheromones(&mut self, value: f32) {
         self.pheromone_tank += value;
         if self.is_out_of_pheromones() {
@@ -427,7 +425,7 @@ impl Ant {
         let forward = self.velocity.normalize();
         let right = Vector2::new(-forward.y, forward.x);
 
-        let ant_length = (CELL_SIZE as f32 * ANT_SIZE_MULTIPLIER);
+        let ant_length = CELL_SIZE as f32 * ANT_SIZE_MULTIPLIER;
         let ant_width = ant_length / 2.0;
 
         let ox = offset_x as f32;

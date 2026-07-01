@@ -1,9 +1,13 @@
 use crate::*;
 
 pub struct World {
+    #[allow(dead_code)]
     pub screen_width: i32,
+    #[allow(dead_code)]
     pub screen_height: i32,
+    #[allow(dead_code)]
     pub grid_width_pixels: i32,
+    #[allow(dead_code)]
     pub grid_height_pixels: i32,
     pub screen_offset_x: i32,
     pub screen_offset_y: i32,
@@ -25,6 +29,7 @@ pub fn is_same_position(position: Vector2, other_position: Vector2, cell_size: u
 }
 
 impl World {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         screen_width: i32,
         screen_height: i32,
@@ -217,18 +222,6 @@ impl World {
         amount
     }
 
-    pub fn is_colony_position(&self, position: Vector2) -> bool {
-        let colony_radius = self.colony.radius * self.colony.radius;
-        position.distance_sqr(self.colony.position) < colony_radius
-    }
-
-    pub fn is_position_obstacle(&self, position: Vector2) -> bool {
-        self.grid
-            .get_cell_from_position(position)
-            .map(|cell| cell.is_obstacle())
-            .unwrap_or(true)
-    }
-
     pub fn screen_to_grid_coords(&self, position: Vector2) -> Option<(u32, u32)> {
         let offset_x = self.screen_offset_x; // (self.screen_width as u32 - self.grid_width_pixels as u32) / 2;
         let offset_y = self.screen_offset_y; // (self.screen_height as u32 - self.grid_height_pixels as u32) / 2;
@@ -310,7 +303,7 @@ impl World {
 
             if self.show_pheromones {
                 if cell.to_home > 0.0 {
-                    let brightness = (((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 1.0);
+                    let brightness = ((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 1.0;
                     let color = PHEROMONE_FORAGING_COLOR.brightness(brightness);
                     d.draw_circle(
                         screen_offset_x + (x * cell_size + cell_size / 2),
@@ -364,14 +357,17 @@ impl World {
         self.grid.get_cell(x, y)
     }
 
+    #[allow(dead_code)]
     pub fn get_cell_mut(&mut self, x: u32, y: u32) -> Option<&mut Cell> {
         self.grid.get_cell_mut(x, y)
     }
 
+    #[allow(dead_code)]
     pub fn get_cell_from_position(&self, position: Vector2) -> Option<&Cell> {
         self.grid.get_cell_from_position(position)
     }
 
+    #[allow(dead_code)]
     pub fn get_cell_mut_from_position(&mut self, position: Vector2) -> Option<&mut Cell> {
         self.grid.get_cell_mut_from_position(position)
     }

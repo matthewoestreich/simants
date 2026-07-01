@@ -6,7 +6,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 7000;
+pub const NUM_ANTS: usize = 5000;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
 pub const ANT_SIZE_MULTIPLIER: f32 = 1.0;
 // Pixels per second
