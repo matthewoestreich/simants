@@ -15,17 +15,24 @@ Ant simulation in Rust with Raylib
 
 # Behavior
 
+Ants do **not** follow a fixed or pre-programmed path. Instead, each ant makes decisions using a simple state machine.
+
 At a high level:
 
-- Ants have 3 sensors, which act like their antennae, and sample the environment at some distance in front of them
-- An ant that has food will sample it's environment for the strongest scent of the "to colony" pheromone, and follow it
-- An ant that is searching for food will sample it's environment for the strongest scent of the "to food" pheromone, and follow it
-- If an ant senses food, and is searching for food, it will steer towards it
-- If an ant senses the colony, and is carrying food, it will steer towards it
-- If an ant has not sensed anything, it wanders randomly
-- Ants have a limited amount of pheromones, which get topped up after finding food and after delivering food
-- An ant will only drop it's pheromone if the amount it plans to drop is greater than the existing amount
-- Pheromones will evaporate in the environment exponentially
+- Each ant has three sensors (similar to antennae) that sample the environment a short distance in front of it.
+- An ant searching for food follows the strongest **"to food"** pheromone it detects.
+- An ant carrying food follows the strongest **"to colony"** pheromone it detects.
+- If a searching ant detects food, it steers toward the sensor that detected it.
+- If an ant carrying food detects the colony, it steers toward the sensor that detected it.
+- If none of its sensors detect anything of interest, the ant wanders randomly.
+- Ants have a limited pheromone supply, which is replenished after collecting food and after delivering food to the colony.
+- An ant deposits pheromone only if the amount it intends to leave is greater than the pheromone already present at that location.
+- An ants speed fluctuates randomly within a given range.
+- Ants carrying food move slower than ants searching for food.
+- An ant will "pause" randomly, per some probability.
+- Pheromones evaporate over time using exponential decay.
+
+Most of these environmental variables can be set in `src/settings.rs`.
 
 # Color Scheme
 
