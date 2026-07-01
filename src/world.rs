@@ -255,7 +255,7 @@ impl World {
         }
     }
 
-    pub fn draw(&mut self, d: &mut RaylibDrawHandle, is_pheromone_mode: bool) {
+    pub fn draw(&mut self, d: &mut RaylibDrawHandle) {
         let cell_size = self.grid.cell_size as i32;
         let screen_offset_x = self.screen_offset_x;
         let screen_offset_y = self.screen_offset_y;
@@ -275,55 +275,13 @@ impl World {
                     );
                 }
                 Terrain::Border => {
-                    match (self.show_border, is_pheromone_mode) {
-                        (true, true) => {
-                            d.draw_rectangle(
-                                screen_offset_x + (x * cell_size),
-                                screen_offset_y + (y * cell_size),
-                                cell_size,
-                                cell_size,
-                                OBSTACLE_COLOR,
-                            );
-                            d.draw_rectangle_lines_ex(
-                                Rectangle::new(
-                                    (screen_offset_x + (x * cell_size)) as f32,
-                                    (screen_offset_y + (y * cell_size)) as f32,
-                                    cell_size as f32,
-                                    cell_size as f32,
-                                ),
-                                (cell_size / (4 * 2)) as f32,
-                                Color::CYAN,
-                            );
-                        }
-                        (true, false) => {
-                            d.draw_rectangle(
-                                screen_offset_x + (x * cell_size),
-                                screen_offset_y + (y * cell_size),
-                                cell_size,
-                                cell_size,
-                                OBSTACLE_COLOR,
-                            );
-                        }
-                        (false, true) => {
-                            d.draw_rectangle(
-                                screen_offset_x + (x * cell_size),
-                                screen_offset_y + (y * cell_size),
-                                cell_size,
-                                cell_size,
-                                Color::CYAN,
-                            );
-                        }
-                        (false, false) => {}
-                    }
-
-                    if self.show_border && is_pheromone_mode {
-                    } else if is_pheromone_mode && !self.show_border {
+                    if self.show_border {
                         d.draw_rectangle(
                             screen_offset_x + (x * cell_size),
                             screen_offset_y + (y * cell_size),
                             cell_size,
                             cell_size,
-                            Color::CYAN,
+                            OBSTACLE_COLOR,
                         );
                     }
                 }

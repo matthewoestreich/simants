@@ -30,7 +30,6 @@ fn main() {
 
     let colony_position = Vector2::new(GRID_WIDTH as f32 / 8.0, GRID_HEIGHT as f32 / 2.0);
     let colony_radius = COLONY_RADIUS * CELL_SIZE as f32;
-
     let colony = AntColony::new_with_immediate_spawn(NUM_ANTS, colony_radius, colony_position);
 
     let mut world = World::new(
@@ -52,86 +51,46 @@ fn main() {
 
     rl.set_target_fps(60);
 
-    let is_paused = &mut false;
-    let is_pheromone_mode = &mut false;
+    let mut is_paused = false;
+    let mut is_dragging = false;
+    let mut is_pheromone_mode = false;
+    let mut click_start_pos = Vector2::zero();
 
+    /* --------------------------------------- */
+    /* ------------ Game Loop ---------------- */
+    /* --------------------------------------- */
     while !rl.window_should_close() {
-        let wheel = rl.get_mouse_wheel_move();
-        if wheel != 0.0 {
-            let mouse_screen_pos = rl.get_mouse_position();
-            let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, camera);
-
-            let scale_factor = 1.0 + (0.15 * wheel.abs());
-            let mut next_zoom = if wheel > 0.0 {
-                camera.zoom * scale_factor
-            } else {
-                camera.zoom / scale_factor
-            };
-
-            next_zoom = next_zoom.clamp(1.0, 10.0);
-
-            if next_zoom > 1.0 {
-                camera.offset = mouse_screen_pos;
-                camera.target = mouse_world_pos;
-                camera.zoom = next_zoom;
-            } else {
-                camera.zoom = 1.0;
-                camera.offset = Vector2::new(0.0, 0.0);
-                camera.target = Vector2::new(0.0, 0.0);
-            }
-        }
-
-        if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
-            let mouse_delta = rl.get_mouse_delta();
-            let drag_vector =
-                Vector2::new(mouse_delta.x / camera.zoom, mouse_delta.y / camera.zoom);
-            camera.target.x -= drag_vector.x;
-            camera.target.y -= drag_vector.y;
-        }
-
-        handle_key_press(&mut rl, &mut world, is_paused, is_pheromone_mode);
-
-        if !*is_paused {
+        if !is_paused {
             world.update(rl.get_frame_time());
         }
 
-        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            let click_position = rl.get_mouse_position();
-            let click_position = rl.get_screen_to_world2D(click_position, camera);
-            if let Some(ant) = world.colony.ants.iter().find(|ant| {
-                ant.is_clicked(
-                    click_position,
-                    12.0f32,
-                    world.screen_offset_x,
-                    world.screen_offset_y,
-                )
-            }) {
-                println!("{ant}");
-            }
-        } else if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_RIGHT) {
-            let clicked = rl.get_mouse_position();
-            if let Some((x, y)) = world.screen_to_grid_coords(clicked)
-                && let Some(cell) = world.get_cell(x, y)
-            {
-                println!("{cell:?}");
-                if cell.is_colony() {
-                    println!(
-                        "Colony has harvested : '{}' food",
-                        world.colony.harvested_food
-                    );
-                }
-            }
-        }
+        handle_key_press(&mut rl, &mut world, &mut is_paused, &mut is_pheromone_mode);
+        handle_mouse_wheel(&mut rl, &mut camera);
+        handle_mouse_click(
+            &mut rl,
+            &mut camera,
+            &mut world,
+            &mut is_dragging,
+            &mut click_start_pos,
+        );
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
 
         {
             let mut mode2d = d.begin_mode2D(camera);
-            world.draw(&mut mode2d, *is_pheromone_mode);
+            world.draw(&mut mode2d);
+        }
+
+        if is_pheromone_mode {
+            d.draw_text("PHEROMONE MODE ON", 10, 10, 20, Color::WHITE);
         }
     }
 }
+
+/* ---------------------------------------------------------------- */
+/* -------------- Helper Functions -------------------------------- */
+/* ---------------------------------------------------------------- */
 
 fn handle_key_press(
     rl: &mut RaylibHandle,
@@ -161,5 +120,99 @@ fn handle_key_press(
         world.toggle_show_ant_sensors();
     } else if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {
         *is_paused = !*is_paused;
+    }
+}
+
+fn handle_mouse_wheel(rl: &mut RaylibHandle, camera: &mut Camera2D) {
+    let wheel = rl.get_mouse_wheel_move();
+    if wheel != 0.0 {
+        let mouse_screen_pos = rl.get_mouse_position();
+        let mouse_world_pos = rl.get_screen_to_world2D(mouse_screen_pos, *camera);
+
+        let scale_factor = 1.0 + (0.15 * wheel.abs());
+        let mut next_zoom = if wheel > 0.0 {
+            camera.zoom * scale_factor
+        } else {
+            camera.zoom / scale_factor
+        };
+
+        next_zoom = next_zoom.clamp(1.0, 10.0);
+
+        if next_zoom > 1.0 {
+            camera.offset = mouse_screen_pos;
+            camera.target = mouse_world_pos;
+            camera.zoom = next_zoom;
+        } else {
+            camera.zoom = 1.0;
+            camera.offset = Vector2::new(0.0, 0.0);
+            camera.target = Vector2::new(0.0, 0.0);
+        }
+    }
+}
+
+fn handle_mouse_click(
+    rl: &mut RaylibHandle,
+    camera: &mut Camera2D,
+    world: &mut World,
+    is_dragging: &mut bool,
+    click_start_pos: &mut Vector2,
+) {
+    const DRAG_THRESHOLD: f32 = 5.0;
+
+    if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+        *click_start_pos = rl.get_mouse_position();
+        *is_dragging = false;
+    }
+
+    if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
+        let current_pos = rl.get_mouse_position();
+
+        if !*is_dragging && current_pos.distance(*click_start_pos) > DRAG_THRESHOLD {
+            *is_dragging = true;
+        }
+
+        if *is_dragging {
+            let mouse_delta = rl.get_mouse_delta();
+            let drag_vector =
+                Vector2::new(mouse_delta.x / camera.zoom, mouse_delta.y / camera.zoom);
+            camera.target.x -= drag_vector.x;
+            camera.target.y -= drag_vector.y;
+        }
+    }
+
+    if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
+        if !*is_dragging {
+            let click_position = rl.get_mouse_position();
+            let click_world_position = rl.get_screen_to_world2D(click_position, *camera);
+
+            if let Some(ant) = world.colony.ants.iter().find(|ant| {
+                ant.is_clicked(
+                    click_world_position,
+                    12.0f32,
+                    world.screen_offset_x,
+                    world.screen_offset_y,
+                )
+            }) {
+                println!("{ant}");
+            }
+        }
+        *is_dragging = false;
+    }
+
+    if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_RIGHT) {
+        let clicked_screen = rl.get_mouse_position();
+        let clicked_world = rl.get_screen_to_world2D(clicked_screen, *camera);
+
+        if let Some((x, y)) = world.screen_to_grid_coords(clicked_world)
+            && let Some(cell) = world.get_cell(x, y)
+        {
+            println!("{cell:?}");
+            if cell.is_colony() {
+                println!(
+                    "Colony has harvested : '{}' food",
+                    world.colony.harvested_food
+                );
+            }
+        }
     }
 }
