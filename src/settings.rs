@@ -42,7 +42,7 @@ pub const ANT_SENSOR_ANGLE: f32 = 45.0; // In radians
 // This number will be multiplied by the cell size.
 pub const ANT_SENSOR_DISTANCE: u32 = 2;
 
-pub const PHEROMONE_DECAY_RATE: f32 = 0.05; // 0.005 seems to be stable
+pub const PHEROMONE_DECAY_RATE: f32 = 0.01; // 0.005 seems to be stable
 pub const FOOD_CELL_MAX_AMOUNT: f32 = 1_000_000.0;
 
 /* ----------------------------------- */
