@@ -135,6 +135,7 @@ impl Ant {
 
     pub fn calculate_next_position(&mut self, delta_time: f32) -> Option<Vector2> {
         let steering_angle = {
+            // If we are looking for food and spotted food.
             if self.is_foraging()
                 && let Some(angle) = self.steer_towards_terrain(Terrain::Food)
             {
@@ -193,19 +194,17 @@ impl Ant {
 
     pub fn has_sensed(&self, t: Terrain) -> bool {
         let samples = &self.sensor_samples;
-        // Prefer going straight
         samples.center.terrain == t || samples.left.terrain == t || samples.right.terrain == t
     }
 
-    pub fn apply_speed_wobble(&mut self, target_speed: f32, delta_time: f32) {
-        let mut target_speed = target_speed;
-
-        if self.is_foraging() {
-            target_speed += self
-                .rng
-                .random_range(-ANT_SPEED_WOBBLE_PERCENT..=ANT_SPEED_WOBBLE_PERCENT);
-        } else if self.is_returning_food() {
-            target_speed *= ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT;
+    pub fn apply_speed_wobble(&mut self, mut target_speed: f32, delta_time: f32) {
+        match self.state {
+            AntState::Foraging => {
+                target_speed += self
+                    .rng
+                    .random_range(-ANT_SPEED_WOBBLE_PERCENT..=ANT_SPEED_WOBBLE_PERCENT)
+            }
+            AntState::ReturningFood => target_speed *= ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT,
         }
 
         self.speed = self.speed + (target_speed - self.speed) * ANT_ACCELERATION_RATE * delta_time;
@@ -222,6 +221,9 @@ impl Ant {
         let cb = samples.center.pheromone_bias;
         let rb = samples.right.pheromone_bias;
 
+        if cb > lb && cb > rb {
+            return Some(0.0);
+        }
         if lb > cb && lb > rb {
             return Some(-ANT_SENSOR_ANGLE);
         }
@@ -229,7 +231,8 @@ impl Ant {
             return Some(ANT_SENSOR_ANGLE);
         }
 
-        Some(0.0f32) // default to going straight
+        // In the edge case where all pheromone bias' are the same, prefer going straight
+        Some(0.0f32)
     }
 
     pub fn harvest(&mut self, from: &mut Cell) {
