@@ -14,6 +14,7 @@ pub struct World {
     pub show_pheromones: bool,
     pub show_border: bool,
     pub show_ant_sensors: bool,
+    pub show_ants: bool,
 }
 
 pub fn is_same_position(position: Vector2, other_position: Vector2, cell_size: u32) -> bool {
@@ -35,6 +36,7 @@ impl World {
         show_pheromones: bool,
         show_border: bool,
         show_ant_sensors: bool,
+        show_ants: bool,
     ) -> Self {
         // Calculate screen position to grid cell offset (needed to map a screen position to a cell)
         let screen_offset_x = (screen_width - grid_width as i32) / 2;
@@ -73,6 +75,9 @@ impl World {
             // Marks a cell as an obstacle.
             // This obstacle will eventually be drawn as a vertical line that is centerted horizontally and vertically
             if x_range.contains(&x) && y_range.contains(&y) {
+                if y % 20 <= 3 {
+                    continue;
+                }
                 cell.terrain = Terrain::Obstacle;
                 continue;
             }
@@ -112,6 +117,7 @@ impl World {
             show_pheromones,
             show_border,
             show_ant_sensors,
+            show_ants,
         }
     }
 
@@ -129,6 +135,10 @@ impl World {
 
     pub fn toggle_show_ant_sensors(&mut self) {
         self.show_ant_sensors = !self.show_ant_sensors;
+    }
+
+    pub fn toggle_show_ants(&mut self) {
+        self.show_ants = !self.show_ants;
     }
 
     pub fn update(&mut self, delta_time: f32) {
@@ -157,7 +167,8 @@ impl World {
             if ant.is_foraging() && current_cell.is_food() {
                 ant.harvest(current_cell);
                 ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
-                ant.turn_around();
+                //ant.turn_around();
+                ant.turn_in_any_direction();
                 continue;
             }
 
@@ -318,37 +329,6 @@ impl World {
                         color,
                     );
                 }
-
-                /*
-                // If there is searching pheromone here, render it
-                if cell.to_home > 0.0 {
-                    let mut color = PHEROMONE_FORAGING_COLOR;
-                    //let intensity = cell.to_home / PHEROMONE_LIFETIME_SECONDS;
-                    //let alpha = (f32::sqrt(intensity) * MAX_RGBA_VALUE) / 2.0;
-                    let alpha = cell.to_home / PHEROMONE_LIFETIME_SECONDS;
-                    color.a = (alpha * MAX_RGBA_VALUE) as u8;
-                    d.draw_circle(
-                        screen_offset_x + (x * cell_size + cell_size / 2),
-                        screen_offset_y + (y * cell_size + cell_size / 2),
-                        cell_size as f32 / 4.0,
-                        color,
-                    );
-                }
-                // If there is a return trail here, render it
-                if cell.to_food > 0.0 {
-                    let mut color = PHEROMONE_RETURNING_FOOD_COLOR;
-                    //let intensity = cell.to_food / PHEROMONE_LIFETIME_SECONDS;
-                    //let alpha = (f32::sqrt(intensity) * MAX_RGBA_VALUE) / 2.0;
-                    let alpha = cell.to_food / PHEROMONE_LIFETIME_SECONDS;
-                    color.a = (alpha * MAX_RGBA_VALUE) as u8;
-                    d.draw_circle(
-                        screen_offset_x + (x * cell_size + cell_size / 2),
-                        screen_offset_y + (y * cell_size + cell_size / 2),
-                        cell_size as f32 / 4.0,
-                        color,
-                    );
-                }
-                */
             }
 
             if self.show_grid {
@@ -371,8 +351,10 @@ impl World {
         }
 
         // FIRST : Draw ants
-        for ant in &self.colony.ants {
-            ant.draw(d, self.show_ant_sensors, screen_offset_x, screen_offset_y);
+        if self.show_ants {
+            for ant in &self.colony.ants {
+                ant.draw(d, self.show_ant_sensors, screen_offset_x, screen_offset_y);
+            }
         }
         // SECOND : Draw colony
         self.colony.draw(d, screen_offset_x, screen_offset_y);

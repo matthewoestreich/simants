@@ -43,13 +43,15 @@ impl AntColony {
 
     pub fn spawn_ants(&mut self) {
         for i in 0..self.num_ants {
-            self.ants.insert(i, Ant::new(self.position));
+            let mut ant = Ant::new(self.position);
+            ant.id = i as i32;
+            self.ants.insert(i, ant);
         }
     }
 
     pub fn draw(&self, d: &mut RaylibDrawHandle, offset_x: i32, offset_y: i32) {
-        let mut color = Color::ORANGERED;
-        color.a = 150; // Semi-transparent tint
+        let mut color = COLONY_COLOR;
+        //color.a = 150; // Semi-transparent tint
         let ox = offset_x as f32;
         let oy = offset_y as f32;
         let position_with_offset = Vector2::new(ox + self.position.x, oy + self.position.y);
@@ -407,7 +409,19 @@ impl Ant {
         let color = match self.state {
             AntState::Foraging => ANT_FORAGING_COLOR,
             AntState::ReturningFood => ANT_RETURNING_FOOD_COLOR,
-            AntState::Paused { .. } => Color::YELLOW,
+            AntState::Paused { .. } => {
+                if let Some(os) = self.state_before_pause {
+                    match os {
+                        AntState::Foraging => ANT_FORAGING_COLOR,
+                        AntState::ReturningFood => ANT_RETURNING_FOOD_COLOR,
+                        _ => {
+                            unreachable!();
+                        }
+                    }
+                } else {
+                    unreachable!();
+                }
+            }
         };
 
         let forward = self.velocity.normalize();
@@ -463,49 +477,42 @@ impl Ant {
 
 impl std::fmt::Display for Ant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{{")?;
+        let sensors = self.sensors.unwrap_or_default();
 
+        writeln!(f, "{{")?;
+        writeln!(f, "  id: {}", self.id)?;
         writeln!(
             f,
             "  position: {{ x: {}, y: {} }}",
             self.position.x, self.position.y
         )?;
-
+        writeln!(
+            f,
+            "  velocity: {{ x: {}, y: {} }}",
+            self.velocity.x, self.velocity.y
+        )?;
+        writeln!(f, "  speed: {}", self.speed)?;
         writeln!(f, "  pheromone_tank: {}", self.pheromone_tank)?;
         writeln!(
             f,
             "  food: {{ carrying: {}, total_harvested: {} }}",
             self.food, self.total_food_harvested
         )?;
-
-        writeln!(
-            f,
-            "  velocity: {{ x: {}, y: {} }}",
-            self.velocity.x, self.velocity.y
-        )?;
-
         writeln!(
             f,
             "  state: {{ current: {:?}, before_pause: {:?}  }}",
             self.state, self.state_before_pause
         )?;
-
         writeln!(
             f,
             "  steering_force: {{ x: {}, y: {} }}",
             self.steering_force.x, self.steering_force.y
         )?;
-
-        let sensors =
-            self.sensors
-                .unwrap_or((Vector2::default(), Vector2::default(), Vector2::default()));
-
         writeln!(f, "  sensors: [")?;
         writeln!(f, "    {{ x: {}, y: {} }}", sensors.0.x, sensors.0.y)?;
         writeln!(f, "    {{ x: {}, y: {} }}", sensors.1.x, sensors.1.y)?;
         writeln!(f, "    {{ x: {}, y: {} }}", sensors.2.x, sensors.2.y)?;
         writeln!(f, "  ]")?;
-
         writeln!(f, "}}")
     }
 }
