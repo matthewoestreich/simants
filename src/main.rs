@@ -52,12 +52,23 @@ fn main() {
     );
 
     let mut is_paused = false;
+    let mut is_pheromone_mode = false;
 
     while !rl.window_should_close() {
-        if rl.is_key_pressed(KeyboardKey::KEY_A) {
+        if is_pheromone_mode {
+            if rl.is_key_pressed(KeyboardKey::KEY_P) {
+                is_pheromone_mode = false;
+            } else if rl.is_key_pressed(KeyboardKey::KEY_F) {
+                world.toggle_show_pheromones("FOOD");
+            } else if rl.is_key_pressed(KeyboardKey::KEY_H) {
+                world.toggle_show_pheromones("HOME");
+            } else if rl.is_key_pressed(KeyboardKey::KEY_A) {
+                world.toggle_show_pheromones("ALL");
+            }
+        } else if rl.is_key_pressed(KeyboardKey::KEY_A) {
             world.toggle_show_ants();
         } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
-            world.toggle_show_pheromones();
+            is_pheromone_mode = true;
         } else if rl.is_key_pressed(KeyboardKey::KEY_B) {
             world.toggle_show_border();
         } else if rl.is_key_pressed(KeyboardKey::KEY_G) {
@@ -101,6 +112,6 @@ fn main() {
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
-        world.draw(&mut d);
+        world.draw(&mut d, is_pheromone_mode);
     }
 }

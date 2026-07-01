@@ -77,11 +77,22 @@ Most of these environmental variables can be set in `src/settings.rs`.
 - **Left mouse click:** If clicked on an ant, prints ant info to terminal.
 - **Right mouse click:** If right click on map (even if an ant is right clicked) it prints info for the underlying cell to terminal.
 
-| Key     | Action                        |
-| ------- | ----------------------------- |
-| `a`     | Toggles rendering ants        |
-| `s`     | Toggles rendering ant sensors |
-| `p`     | Toggles rendering pheromones  |
-| `b`     | Toggles rendering border      |
-| `g`     | Toggles rendering grid        |
-| `SPACE` | Toggles paused state          |
+| Key     | Action                                           |
+| ------- | ------------------------------------------------ |
+| `a`     | Toggles rendering ants                           |
+| `s`     | Toggles rendering ant sensors                    |
+| `p`     | Enters "pheromone mode" (denoted by cyan border) |
+| `b`     | Toggles rendering border                         |
+| `g`     | Toggles rendering grid                           |
+| `SPACE` | Toggles paused state                             |
+
+**Pheromone Mode**
+
+While in "pheromone mode" there will be a dotted cyan border.
+
+| Key | Action                                   |
+| --- | ---------------------------------------- |
+| `p` | Exit "pheromone mode"                    |
+| `a` | Toggles rendering all pheromones         |
+| `f` | Toggles rendering "to food" pheromones   |
+| `h` | Toggles rendering "to colony" pheromones |

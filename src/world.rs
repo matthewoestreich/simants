@@ -15,7 +15,8 @@ pub struct World {
     pub grid: Grid,
 
     pub show_grid: bool,
-    pub show_pheromones: bool,
+    pub show_to_home_pheromones: bool,
+    pub show_to_food_pheromones: bool,
     pub show_border: bool,
     pub show_ant_sensors: bool,
     pub show_ants: bool,
@@ -119,7 +120,8 @@ impl World {
             grid,
             colony,
             show_grid,
-            show_pheromones,
+            show_to_home_pheromones: show_pheromones,
+            show_to_food_pheromones: show_pheromones,
             show_border,
             show_ant_sensors,
             show_ants,
@@ -130,8 +132,21 @@ impl World {
         self.show_border = !self.show_border;
     }
 
-    pub fn toggle_show_pheromones(&mut self) {
-        self.show_pheromones = !self.show_pheromones;
+    // 'show' should be "ALL", "FOOD", or "HOME"
+    pub fn toggle_show_pheromones(&mut self, show: &str) {
+        match show {
+            "ALL" => {
+                self.show_to_home_pheromones = !self.show_to_home_pheromones;
+                self.show_to_food_pheromones = !self.show_to_food_pheromones;
+            }
+            "FOOD" => {
+                self.show_to_food_pheromones = !self.show_to_food_pheromones;
+            }
+            "HOME" => {
+                self.show_to_home_pheromones = !self.show_to_home_pheromones;
+            }
+            _ => {}
+        }
     }
 
     pub fn toggle_show_grid(&mut self) {
@@ -240,7 +255,7 @@ impl World {
         }
     }
 
-    pub fn draw(&mut self, d: &mut RaylibDrawHandle) {
+    pub fn draw(&mut self, d: &mut RaylibDrawHandle, is_pheromone_mode: bool) {
         let cell_size = self.grid.cell_size as i32;
         let screen_offset_x = self.screen_offset_x;
         let screen_offset_y = self.screen_offset_y;
@@ -260,13 +275,55 @@ impl World {
                     );
                 }
                 Terrain::Border => {
-                    if self.show_border {
+                    match (self.show_border, is_pheromone_mode) {
+                        (true, true) => {
+                            d.draw_rectangle(
+                                screen_offset_x + (x * cell_size),
+                                screen_offset_y + (y * cell_size),
+                                cell_size,
+                                cell_size,
+                                OBSTACLE_COLOR,
+                            );
+                            d.draw_rectangle_lines_ex(
+                                Rectangle::new(
+                                    (screen_offset_x + (x * cell_size)) as f32,
+                                    (screen_offset_y + (y * cell_size)) as f32,
+                                    cell_size as f32,
+                                    cell_size as f32,
+                                ),
+                                (cell_size / (4 * 2)) as f32,
+                                Color::CYAN,
+                            );
+                        }
+                        (true, false) => {
+                            d.draw_rectangle(
+                                screen_offset_x + (x * cell_size),
+                                screen_offset_y + (y * cell_size),
+                                cell_size,
+                                cell_size,
+                                OBSTACLE_COLOR,
+                            );
+                        }
+                        (false, true) => {
+                            d.draw_rectangle(
+                                screen_offset_x + (x * cell_size),
+                                screen_offset_y + (y * cell_size),
+                                cell_size,
+                                cell_size,
+                                Color::CYAN,
+                            );
+                        }
+                        (false, false) => {}
+                    }
+
+                    if self.show_border && is_pheromone_mode {
+                    } else if is_pheromone_mode && !self.show_border {
                         d.draw_rectangle(
                             screen_offset_x + (x * cell_size),
                             screen_offset_y + (y * cell_size),
                             cell_size,
                             cell_size,
-                            OBSTACLE_COLOR,
+                            Color::CYAN,
                         );
                     }
                 }
@@ -293,29 +350,27 @@ impl World {
                 Terrain::Invalid => unreachable!("we should never try to draw an invalid cell"),
             };
 
-            if self.show_pheromones {
-                if cell.to_home > 0.0 {
-                    let brightness = ((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 1.0;
-                    let color = PHEROMONE_FORAGING_COLOR.brightness(brightness + 0.2);
-                    d.draw_rectangle(
-                        screen_offset_x + (x * cell_size + cell_size / 2),
-                        screen_offset_y + (y * cell_size + cell_size / 2),
-                        cell_size,
-                        cell_size,
-                        color,
-                    );
-                }
-                if cell.to_food > 0.0 {
-                    let brightness = ((cell.to_food / MAX_RGBA_VALUE) * 2.0) - 1.0;
-                    let color = PHEROMONE_RETURNING_FOOD_COLOR.brightness(brightness + 0.2);
-                    d.draw_rectangle(
-                        screen_offset_x + (x * cell_size + cell_size / 2),
-                        screen_offset_y + (y * cell_size + cell_size / 2),
-                        cell_size,
-                        cell_size,
-                        color,
-                    );
-                }
+            if self.show_to_home_pheromones && cell.to_home > 0.0 {
+                let brightness = ((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 1.0;
+                let color = PHEROMONE_FORAGING_COLOR.brightness(brightness + 0.2);
+                d.draw_rectangle(
+                    screen_offset_x + (x * cell_size + cell_size / 2),
+                    screen_offset_y + (y * cell_size + cell_size / 2),
+                    cell_size,
+                    cell_size,
+                    color,
+                );
+            }
+            if self.show_to_food_pheromones && cell.to_food > 0.0 {
+                let brightness = ((cell.to_food / MAX_RGBA_VALUE) * 2.0) - 1.0;
+                let color = PHEROMONE_RETURNING_FOOD_COLOR.brightness(brightness + 0.2);
+                d.draw_rectangle(
+                    screen_offset_x + (x * cell_size + cell_size / 2),
+                    screen_offset_y + (y * cell_size + cell_size / 2),
+                    cell_size,
+                    cell_size,
+                    color,
+                );
             }
 
             if self.show_grid {
