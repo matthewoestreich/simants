@@ -1,17 +1,18 @@
 # simants
 
-Ant simulation in Rust with Raylib
+Ant simulation in Rust with Raylib (and no AI)
 
 <p align="center">
-  <img width="32%" height="10%" alt="ants" src="https://github.com/user-attachments/assets/23cfd914-821a-4289-a72b-be5fb104080f" />
-  <img width="32%" height="10%" alt="ants_pheromones" src="https://github.com/user-attachments/assets/bf1856a9-61a0-4f99-9de4-3396561e9321" />
-  <img width="32%" height="10%" alt="ants_pheromones_grid_border" src="https://github.com/user-attachments/assets/de25945f-fcc0-475d-8f52-69fceed7490b" />
+  <img width="32%" height="10%" alt="ants" src="https://github.com/user-attachments/assets/e81afa52-79bf-4088-b365-deffa2af544e" />
+  <img width="32%" height="10%" alt="ants_pheromones" src="https://github.com/user-attachments/assets/ce8050ca-6129-40c6-8781-13c51d43f5e2" />
+  <img width="32%" height="10%" alt="pheromones" src="https://github.com/user-attachments/assets/3bb47e96-7496-4f0d-8b23-489bc0d21813" />
 </p>
 <p align="center">
-  <img width="32%" height="10% alt="pheromones" src="https://github.com/user-attachments/assets/10806f94-6571-42bb-8b15-f10ab05c9369" />
-  <img width="32%" height="10%" height="827" alt="ants_sensors" src="https://github.com/user-attachments/assets/9084ccc9-f0dc-4baa-8bf8-fb6820a835ba" />
-  <img width="32%" height="10%" alt="Screenshot 2026-06-30 at 8 17 50 PM" src="https://github.com/user-attachments/assets/04c81459-bcaa-4807-86a6-9aed457cc3cd" />
+  <img width="32%" height="10%" alt="ants_pheromones_sensors" src="https://github.com/user-attachments/assets/3ec2abd9-b752-4d55-8e5c-39db90b29fcc" />
+  <img width="32%" height="10%" alt="everything_rendered" src="https://github.com/user-attachments/assets/e8c53256-eeff-40ff-a15d-6c8525195400" />
+  <img width="32%" height="10%" alt="over_time" src="https://github.com/user-attachments/assets/d13e7f15-ff0f-47e9-8fef-aa82aee48b76" />
 </p>
+<small>(all screenshots taken within 15 minutes of eachother)</small>
 
 # Behavior
 
