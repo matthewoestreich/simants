@@ -518,6 +518,7 @@ impl std::fmt::Display for Ant {
             self.food, self.total_food_harvested
         )?;
         writeln!(f, "  state: {:?}", self.state)?;
+        writeln!(f, "  kind: {:?}", self.kind)?;
         writeln!(
             f,
             "  steering_force: {{ x: {}, y: {} }}",
