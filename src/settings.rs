@@ -6,9 +6,9 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 1000;
+pub const NUM_ANTS: usize = 6_000;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
-pub const ANT_SIZE_MULTIPLIER: f32 = 2.0;
+pub const ANT_SIZE_MULTIPLIER: f32 = 1.0;
 // Pixels per second
 pub const ANT_MAX_SPEED: f32 = 30.0; // 40.0 seems to be stable
 pub const ANT_SPEED_WOBBLE_PERCENT: f32 = 25.0;
@@ -55,7 +55,7 @@ pub const SHOW_PHEROMONES: bool = false;
 pub const SHOW_ANT_SENSORS: bool = false;
 pub const SHOW_GRID_LINES: bool = false;
 pub const COLONY_RADIUS: f32 = 8.0;
-pub const FOOD_RADIUS: f32 = 4.0;
+pub const FOOD_RADIUS: f32 = 16.0;
 
 /* ----------------------------------- */
 /* ------- Window/GUI Options -------- */

@@ -38,7 +38,7 @@ fn main() {
 
     let colony_position = Vector2::new(GRID_WIDTH as f32 / 8.0, GRID_HEIGHT as f32 / 2.0);
     let colony_radius = COLONY_RADIUS * CELL_SIZE as f32;
-    let colony = AntColony::new_with_immediate_spawn(NUM_ANTS, colony_radius, colony_position);
+    let colony = AntColony::new_with_immediate_spawn(NUM_ANTS, 3.0, colony_radius, colony_position);
 
     let mut world = World::new(
         rl.get_screen_width(),

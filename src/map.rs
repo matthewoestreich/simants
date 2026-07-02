@@ -89,15 +89,15 @@ impl Grid {
 
         match ant_state {
             AntState::Foraging => {
-                this.pheromone_bias = this.to_food_strength;
+                this.target_pheromone = this.to_food_strength;
                 if this.terrain.is_food() {
-                    this.pheromone_bias += 1000.0;
+                    this.target_pheromone += 1000.0;
                 }
             }
             AntState::ReturningFood => {
-                this.pheromone_bias = this.to_home_strength;
+                this.target_pheromone = this.to_home_strength;
                 if this.terrain.is_colony() {
-                    this.pheromone_bias += 1000.0;
+                    this.target_pheromone += 1000.0;
                 }
             }
         };
@@ -185,7 +185,7 @@ pub struct CellSample {
     pub terrain: Terrain,
     pub to_food_strength: f32,
     pub to_home_strength: f32,
-    pub pheromone_bias: f32,
+    pub target_pheromone: f32,
     pub food_amount: f32,
 }
 
