@@ -77,9 +77,9 @@ pub const MAX_RGBA_VALUE: f32 = 255.0;
 /* ----------------------------------- */
 
 pub const BACKGROUND_COLOR: Color = Color::BLACK;
-pub const ANT_FORAGING_COLOR: Color = Color::ORANGE;
+pub const ANT_FORAGING_COLOR: Color = Color::RED;
 pub const ANT_RETURNING_FOOD_COLOR: Color = Color::LIME;
-pub const PHEROMONE_FORAGING_COLOR: Color = Color::RED;
+pub const PHEROMONE_FORAGING_COLOR: Color = Color::MAROON;
 pub const PHEROMONE_RETURNING_FOOD_COLOR: Color = Color::GREEN;
 pub const OBSTACLE_COLOR: Color = Color::DARKMAGENTA;
 pub const COLONY_COLOR: Color = Color::ROYALBLUE;

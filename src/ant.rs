@@ -75,7 +75,7 @@ impl AntColony {
 }
 
 /* ---------------------------------------------------------------- */
-/* -------------- SensorReadings ---------------------------------- */
+/* -------------- Sensing ----------------------------------------- */
 /* ---------------------------------------------------------------- */
 
 #[derive(Default, Debug, Clone)]
@@ -201,6 +201,31 @@ impl Ant {
         Some(self.position + self.velocity * delta_time)
     }
 
+    // If the provided terrain is not sensed we return None and thereore do not change steering.
+    pub fn steer_towards_terrain(&self, t: Terrain) -> Option<f32> {
+        if !self.has_sensed(t) {
+            return None;
+        }
+
+        let samples = &self.sensor_samples;
+        let lb = samples.left.pheromone_bias;
+        let cb = samples.center.pheromone_bias;
+        let rb = samples.right.pheromone_bias;
+
+        if cb > lb && cb > rb {
+            return Some(0.0);
+        }
+        if lb > cb && lb > rb {
+            return Some(-ANT_SENSOR_ANGLE);
+        }
+        if rb > cb && rb > lb {
+            return Some(ANT_SENSOR_ANGLE);
+        }
+
+        // In the edge case where all pheromone bias' are the same, prefer going straight
+        Some(0.0f32)
+    }
+
     pub fn apply_steering(&mut self, steering_angle: f32, delta_time: f32) {
         let desired_velocity = self.velocity.rotate(steering_angle).normalize() * self.speed;
         let steering_force = desired_velocity - self.velocity;
@@ -227,31 +252,6 @@ impl Ant {
         }
 
         self.speed = self.speed + (target_speed - self.speed) * ANT_ACCELERATION_RATE * delta_time;
-    }
-
-    // If the provided terrain is not sensed we return None and thereore do not change steering.
-    pub fn steer_towards_terrain(&self, t: Terrain) -> Option<f32> {
-        if !self.has_sensed(t) {
-            return None;
-        }
-
-        let samples = &self.sensor_samples;
-        let lb = samples.left.pheromone_bias;
-        let cb = samples.center.pheromone_bias;
-        let rb = samples.right.pheromone_bias;
-
-        if cb > lb && cb > rb {
-            return Some(0.0);
-        }
-        if lb > cb && lb > rb {
-            return Some(-ANT_SENSOR_ANGLE);
-        }
-        if rb > cb && rb > lb {
-            return Some(ANT_SENSOR_ANGLE);
-        }
-
-        // In the edge case where all pheromone bias' are the same, prefer going straight
-        Some(0.0f32)
     }
 
     // Gets a random number from ANT_HARVEST_AMOUNT_RANGE and takes it from
