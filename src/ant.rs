@@ -5,12 +5,13 @@ use crate::{
         ANT_HARVEST_AMOUNT_RANGE, ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
         ANT_OBSTACLE_PANIC_ANGLE_RANGE, ANT_PAUSE_FOR_RANGE_IN_SEC, ANT_PAUSE_PROBABILITY,
         ANT_RETURNING_FOOD_COLOR, ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE, ANT_SIZE_MULTIPLIER,
-        ANT_SPEED_WOBBLE_PERCENT, ANT_TURN_ANGLE, CELL_SIZE, COLONY_COLOR, FOOD_COLOR,
+        ANT_SPEED_WOBBLE_PERCENT, ANT_TURN_ANGLE, CELL_SIZE, COLONY_COLOR,
+        EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE, FOOD_COLOR,
     },
 };
 use rand::RngExt as _;
 use raylib::{
-    ffi::Vector2,
+    ffi::{Color, Vector2},
     prelude::{RaylibDraw as _, RaylibDrawHandle},
 };
 
@@ -60,7 +61,11 @@ impl AntColony {
 
             ant.id = i as i32;
             if pcnt > 0.0 {
-                ant.kind = AntKind::Explorer;
+                let sec_remaining = ant.rng.random_range(EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE);
+                ant.kind = AntKind::Explorer {
+                    start: sec_remaining,
+                    stop: 0.0,
+                };
                 pcnt -= 1.0;
             }
 
@@ -115,7 +120,10 @@ pub enum AntState {
 pub enum AntKind {
     #[default]
     Forager,
-    Explorer,
+    Explorer {
+        start: f32, // seconds remaining til we start exploring
+        stop: f32,  // seconds remaining til we stop exploring
+    },
 }
 
 /* ---------------------------------------------------------------- */
@@ -192,8 +200,11 @@ impl Ant {
 
     pub fn calculate_next_position(&mut self, delta_time: f32) -> Option<Vector2> {
         let steering_angle = {
+            if self.is_exploring() {
+                self.get_random_wander_angle()
+            }
             // If we are looking for food and spotted food.
-            if self.is_foraging()
+            else if self.is_foraging()
                 && let Some(angle) = self.steer_towards_terrain(Terrain::Food)
             {
                 angle.to_radians()
@@ -210,9 +221,7 @@ impl Ant {
             }
             // No pheromones found, wander randomly
             else {
-                self.rng
-                    .random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
-                    .to_radians()
+                self.get_random_wander_angle()
             }
         };
 
@@ -368,6 +377,12 @@ impl Ant {
         }
     }
 
+    fn get_random_wander_angle(&mut self) -> f32 {
+        self.rng
+            .random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
+            .to_radians()
+    }
+
     pub fn set_pheromone_tank(&mut self, value: f32) {
         self.pheromone_tank = value.max(0.0);
     }
@@ -391,6 +406,80 @@ impl Ant {
 
     pub fn is_foraging(&self) -> bool {
         matches!(self.state, AntState::Foraging)
+    }
+
+    pub fn is_explorer_kind(&self) -> bool {
+        matches!(self.kind, AntKind::Explorer { .. })
+    }
+
+    pub fn is_exploring(&self) -> bool {
+        if let AntKind::Explorer { start, stop } = self.kind
+            && start <= 0.0
+            && stop > 0.0
+        {
+            return true;
+        }
+        false
+    }
+
+    pub fn should_start_exploring(&self) -> bool {
+        if let AntKind::Explorer { start, .. } = self.kind
+            && start <= 0.0
+        {
+            return true;
+        }
+        false
+    }
+
+    pub fn should_stop_exploring(&self) -> bool {
+        if let AntKind::Explorer { stop, .. } = self.kind
+            && stop <= 0.0
+        {
+            return true;
+        }
+        false
+    }
+
+    pub fn decrement_explore_stop_timer(&mut self, by: f32) {
+        if let AntKind::Explorer { ref mut stop, .. } = self.kind {
+            *stop -= by;
+        }
+    }
+
+    pub fn decrement_explore_start_timer(&mut self, by: f32) {
+        if let AntKind::Explorer { ref mut start, .. } = self.kind {
+            *start -= by;
+        }
+    }
+
+    pub fn start_exploring(&mut self) {
+        // Ant is AntKind::Explorer and the 'time left until exploring' is out.
+        if let AntKind::Explorer {
+            ref mut start,
+            ref mut stop,
+        } = self.kind
+        {
+            *start = 0.0;
+            *stop = self.rng.random_range(10.0..45.0);
+        }
+        let a = if rand::random() {
+            -90.0f32.to_radians()
+        } else {
+            90.0f32.to_radians()
+        };
+        self.pheromone_tank += 0.01;
+        self.velocity = self.velocity.rotate(a);
+    }
+
+    pub fn stop_exploring(&mut self) {
+        if let AntKind::Explorer {
+            ref mut start,
+            ref mut stop,
+        } = self.kind
+        {
+            *start = self.rng.random_range(5.0..10.0);
+            *stop = 0.0;
+        }
     }
 
     pub fn is_returning_food(&self) -> bool {
@@ -452,6 +541,10 @@ impl Ant {
         let left_back = ant_pos - (forward * (ant_length / 2.0)) - (right * (ant_width / 2.0));
         let right_back = ant_pos - (forward * (ant_length / 2.0)) + (right * (ant_width / 2.0));
         d.draw_triangle(spear, left_back, right_back, ant_color);
+
+        if matches!(self.kind, AntKind::Explorer { .. }) {
+            d.draw_triangle_lines(spear, left_back, right_back, Color::YELLOW);
+        }
 
         if draw_sensors {
             sensor_color.a = 150; // semi-transparent

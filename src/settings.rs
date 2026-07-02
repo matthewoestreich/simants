@@ -6,11 +6,15 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 6_000;
+pub const NUM_ANTS: usize = 12_000;
+pub const PERCENT_OF_EXPLORER_ANTS: f32 = 1.0;
+// When an explorer ants time to explore runs out, it goes exploring.
+// We pick a random number in this range so not all ants go exploring at the same time.
+pub const EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE: Range<f32> = 5.0..10.0;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
-pub const ANT_SIZE_MULTIPLIER: f32 = 1.0;
+pub const ANT_SIZE_MULTIPLIER: f32 = 2.0;
 // Pixels per second
-pub const ANT_MAX_SPEED: f32 = 30.0; // 40.0 seems to be stable
+pub const ANT_MAX_SPEED: f32 = 40.0; // 40.0 seems to be stable
 pub const ANT_SPEED_WOBBLE_PERCENT: f32 = 25.0;
 pub const ANT_ACCELERATION_RATE: f32 = 5.0;
 // Ants carrying food are naturally slower. If this value is 0.70, it will slow the ant down 30%
@@ -19,7 +23,7 @@ pub const ANT_MAX_PHEROMONE_CAPACITY: f32 = 200.0;
 pub const ANT_HARVEST_AMOUNT_RANGE: Range<f32> = 10.0..50.0;
 // How fast can an ant turn. The higher this value, the longer it will take an ant to face a
 // difffernt direction.
-pub const ANT_MAX_TURN_FORCE: f32 = 22.0;
+pub const ANT_MAX_TURN_FORCE: f32 = 20.0;
 // In radians
 pub const ANT_TURN_ANGLE: f32 = 35.0; //pub const ANT_TURN_ANGLE_RANGE: Range<f32> = -25.0..25.0;
 // When an ant is at an obstacle, we furst flip the current direction it is facingg, so we need to

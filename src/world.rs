@@ -192,8 +192,23 @@ impl World {
 
             let current_cell = ant.sense_environment(&mut self.grid);
 
+            if ant.is_explorer_kind() {
+                if ant.is_exploring() {
+                    ant.decrement_explore_stop_timer(delta_time);
+                    if ant.should_stop_exploring() {
+                        ant.stop_exploring();
+                    }
+                } else {
+                    ant.decrement_explore_start_timer(delta_time);
+                    if ant.should_start_exploring() {
+                        //ant.set_pheromone_tank(ant.get_pheromones_remaining() + 3.5);
+                        ant.start_exploring();
+                    }
+                }
+            }
+
             // Gather food
-            if ant.is_foraging() && current_cell.is_food() {
+            if !ant.is_exploring() && ant.is_foraging() && current_cell.is_food() {
                 // TODO : clean this up
                 let harvested_amount = ant.harvest(current_cell.food);
                 current_cell.food = (current_cell.food - harvested_amount).max(0.0);
@@ -203,7 +218,7 @@ impl World {
             }
 
             // Deliver food to colony
-            if ant.is_returning_food() && current_cell.is_colony() {
+            if !ant.is_exploring() && ant.is_returning_food() && current_cell.is_colony() {
                 if is_same_position(colony_center, ant.position, self.grid.cell_size) {
                     self.colony.harvested_food += ant.deliver_food();
                     ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
