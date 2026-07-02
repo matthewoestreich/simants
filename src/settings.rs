@@ -31,7 +31,7 @@ pub const ANT_PAUSE_PROBABILITY: f64 = 0.001;
 // We choose a random number in this range and have the ant pause for that many seconds
 pub const ANT_PAUSE_FOR_RANGE_IN_SEC: Range<f32> = 0.5..1.2;
 // The longer an ant walks, the weaker the pheromones it drops are.
-pub const ANT_PHEROMONE_LOSS_RATE: f32 = 0.5;
+pub const ANT_PHEROMONE_LOSS_RATE: f32 = 0.3;
 // Ants have 3 sensors that can 'read' what is in front of them.
 // One directly ahead at some distance, another at some angle to the right of the one directly ahead,
 // and one at the negative value of said angle to the left of the one directly ahead.
@@ -42,8 +42,8 @@ pub const ANT_SENSOR_ANGLE: f32 = 45.0; // In radians
 // This number will be multiplied by the cell size.
 pub const ANT_SENSOR_DISTANCE: u32 = 2;
 
-pub const PHEROMONE_DECAY_RATE: f32 = 0.011; // 0.005 seems to be stable
-pub const FOOD_CELL_MAX_AMOUNT: f32 = 1_000_000.0;
+pub const PHEROMONE_DECAY_RATE: f32 = 0.003; // 0.005 seems to be stable
+pub const FOOD_CELL_MAX_AMOUNT: f32 = 100_000.0;
 
 /* ----------------------------------- */
 /* ------- Hide/Show Entities -------- */
@@ -77,7 +77,7 @@ pub const MAX_RGBA_VALUE: f32 = 255.0;
 /* ----------------------------------- */
 
 pub const BACKGROUND_COLOR: Color = Color::BLACK;
-pub const ANT_FORAGING_COLOR: Color = Color::ORANGERED;
+pub const ANT_FORAGING_COLOR: Color = Color::ORANGE;
 pub const ANT_RETURNING_FOOD_COLOR: Color = Color::LIME;
 pub const PHEROMONE_FORAGING_COLOR: Color = Color::RED;
 pub const PHEROMONE_RETURNING_FOOD_COLOR: Color = Color::GREEN;
