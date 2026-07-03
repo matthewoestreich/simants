@@ -52,9 +52,9 @@ impl Renderer {
     pub fn new(world_panel: WorldPanel) -> Self {
         Self {
             world_panel,
-            show_grid: true,
+            show_grid: false,
             show_ants: true,
-            show_ant_sensors: true,
+            show_ant_sensors: false,
             show_border: true,
             show_pheromones: true,
         }
@@ -164,14 +164,6 @@ impl Renderer {
                 Terrain::Invalid => unreachable!("should never try to draw an invalid cell"),
             };
 
-            d.draw_rectangle(
-                screen.x as i32,
-                screen.y as i32,
-                self.world_panel.cell_size.x as i32,
-                self.world_panel.cell_size.y as i32,
-                color,
-            );
-
             if self.show_grid {
                 let thickness = 0.5;
                 let line_color = Color::new(80, 80, 80, 255);
@@ -183,6 +175,18 @@ impl Renderer {
                 );
                 d.draw_rectangle_lines_ex(rect, thickness, line_color);
             }
+
+            if cell.is_border() && !self.show_border {
+                continue;
+            }
+
+            d.draw_rectangle(
+                screen.x as i32,
+                screen.y as i32,
+                self.world_panel.cell_size.x as i32 + 1,
+                self.world_panel.cell_size.y as i32 + 1,
+                color,
+            );
         }
 
         //let color = FOOD_COLOR;
