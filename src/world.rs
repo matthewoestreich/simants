@@ -1,171 +1,20 @@
 use crate::{
     ant::AntColony,
-    map::{Cell, Grid, Terrain},
-    settings::{
-        ANT_MAX_PHEROMONE_CAPACITY, ANT_PHEROMONE_LOSS_RATE, BACKGROUND_COLOR,
-        FOOD_CELL_MAX_AMOUNT, FOOD_COLOR, FOOD_RADIUS, MAX_RGBA_VALUE, OBSTACLE_COLOR,
-        PHEROMONE_DECAY_RATE, PHEROMONE_FORAGING_COLOR, PHEROMONE_RETURNING_FOOD_COLOR,
-    },
-};
-use raylib::{
-    ffi::{Color, Rectangle, Vector2},
-    prelude::{RaylibDraw as _, RaylibDrawHandle},
+    map::{Grid, Terrain},
+    settings::{ANT_MAX_PHEROMONE_CAPACITY, ANT_PHEROMONE_LOSS_RATE, PHEROMONE_DECAY_RATE},
 };
 
 pub struct World {
-    #[allow(dead_code)]
-    pub screen_width: i32,
-    #[allow(dead_code)]
-    pub screen_height: i32,
-    #[allow(dead_code)]
-    pub grid_width_pixels: i32,
-    #[allow(dead_code)]
-    pub grid_height_pixels: i32,
-    pub screen_offset_x: i32,
-    pub screen_offset_y: i32,
     pub colony: AntColony,
     pub grid: Grid,
-
-    pub show_grid: bool,
-    pub show_to_home_pheromones: bool,
-    pub show_to_food_pheromones: bool,
-    pub show_border: bool,
-    pub show_ant_sensors: bool,
-    pub show_ants: bool,
 }
 
 impl World {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        screen_width: i32,
-        screen_height: i32,
-        grid_width: u32,
-        grid_height: u32,
-        cell_size: u32,
-        colony: AntColony,
-        show_grid: bool,
-        show_pheromones: bool,
-        show_border: bool,
-        show_ant_sensors: bool,
-        show_ants: bool,
-    ) -> Self {
-        // Calculate screen position to grid cell offset (needed to map a screen position to a cell)
-        let screen_offset_x = (screen_width - grid_width as i32) / 2;
-        let screen_offset_y = (screen_height - grid_height as i32) / 2;
-
-        // Calculate number of cells per width & height pixels
-        let cols = grid_width / cell_size;
-        let rows = grid_height / cell_size;
-
-        // For drawing vertical line obstacle in mid of screen
-        let line_len = rows / 2;
-        let line_start_y = (rows - line_len) / 2;
-        let line_end_y = line_start_y + line_len;
-        let mid_w = cols / 2;
-        let x_range = (mid_w - 1)..=(mid_w + 1);
-        let y_range = line_start_y..=line_end_y;
-
-        // For drawing food clump
-        let food_center_x = (cols * 3) / 4;
-        let food_center_y = rows / 2;
-        let food_radius = FOOD_RADIUS; // Radius measured in number of grid cells
-
-        let mut grid = Grid::new(cols, rows, cell_size);
-        let cell_size_f32 = cell_size as f32;
-
-        for cell in &mut grid {
-            let x = cell.x;
-            let y = cell.y;
-
-            // Mark border cells
-            if x == 0 || x == cols - 1 || y == 0 || y == rows - 1 {
-                cell.terrain = Terrain::Border;
-                continue;
-            }
-
-            // Marks a cell as an obstacle.
-            // This obstacle will eventually be drawn as a vertical line that is centerted horizontally and vertically
-            if x_range.contains(&x) && y_range.contains(&y) {
-                //if y % 20 <= 3 {
-                //    continue;
-                //}
-                cell.terrain = Terrain::Obstacle;
-                continue;
-            }
-
-            // Marks a cell as food.
-            let food_dx = x as i32 - food_center_x as i32;
-            let food_dy = y as i32 - food_center_y as i32;
-            if food_dx * food_dx + food_dy * food_dy <= food_radius as i32 * food_radius as i32 {
-                cell.terrain = Terrain::Food;
-                cell.food = FOOD_CELL_MAX_AMOUNT;
-                continue;
-            }
-
-            // Mark the underlying cells of the colony as such
-            let cell_center = Vector2::new(
-                (x as f32 * cell_size_f32) + (cell_size_f32 / 2.0),
-                (y as f32 * cell_size_f32) + (cell_size_f32 / 2.0),
-            );
-            // If distance from cell center to colony center is less than or
-            // equal to the colony area, it means we are in the colony.
-            if cell_center.distance_sqr(colony.position) <= colony.area {
-                cell.terrain = Terrain::Colony;
-                continue;
-            }
-        }
-
-        Self {
-            screen_width,
-            screen_height,
-            grid_width_pixels: grid_width as i32,
-            grid_height_pixels: grid_height as i32,
-            screen_offset_x,
-            screen_offset_y,
-            grid,
-            colony,
-            show_grid,
-            show_to_home_pheromones: show_pheromones,
-            show_to_food_pheromones: show_pheromones,
-            show_border,
-            show_ant_sensors,
-            show_ants,
-        }
+    pub fn new(grid: Grid, colony: AntColony) -> Self {
+        Self { grid, colony }
     }
 
-    pub fn toggle_show_border(&mut self) {
-        self.show_border = !self.show_border;
-    }
-
-    // 'show' should be "ALL", "FOOD", or "HOME"
-    pub fn toggle_show_pheromones(&mut self, show: &str) {
-        match show {
-            "ALL" => {
-                self.show_to_home_pheromones = !self.show_to_home_pheromones;
-                self.show_to_food_pheromones = !self.show_to_food_pheromones;
-            }
-            "FOOD" => {
-                self.show_to_food_pheromones = !self.show_to_food_pheromones;
-            }
-            "HOME" => {
-                self.show_to_home_pheromones = !self.show_to_home_pheromones;
-            }
-            _ => {}
-        }
-    }
-
-    pub fn toggle_show_grid(&mut self) {
-        self.show_grid = !self.show_grid;
-    }
-
-    pub fn toggle_show_ant_sensors(&mut self) {
-        self.show_ant_sensors = !self.show_ant_sensors;
-    }
-
-    pub fn toggle_show_ants(&mut self) {
-        self.show_ants = !self.show_ants;
-    }
-
+    /*
     pub fn update(&mut self, delta_time: f32) {
         for cell in self.grid.iter_mut() {
             match cell.terrain {
@@ -229,6 +78,7 @@ impl World {
             }
         }
     }
+    */
 
     pub fn calculate_decayed_amount(strength: f32, delta_time: f32, decay_rate: f32) -> f32 {
         if strength <= 0.0 {
@@ -242,13 +92,14 @@ impl World {
         amount
     }
 
-    pub fn is_same_position(position: Vector2, other_position: Vector2, cell_size: u32) -> bool {
-        let half_size = cell_size as f32 / 2.0;
-        let dx = (other_position.x - position.x).abs();
-        let dy = (other_position.y - position.y).abs();
-        dx <= half_size && dy <= half_size
-    }
+    //pub fn is_same_position(position: Vector2, other_position: Vector2, cell_size: u32) -> bool {
+    //    let half_size = cell_size as f32 / 2.0;
+    //    let dx = (other_position.x - position.x).abs();
+    //    let dy = (other_position.y - position.y).abs();
+    //    dx <= half_size && dy <= half_size
+    //}
 
+    /*
     pub fn screen_to_grid_coords(&self, position: Vector2) -> Option<(u32, u32)> {
         let offset_x = self.screen_offset_x;
         let offset_y = self.screen_offset_y;
@@ -268,129 +119,10 @@ impl World {
             None
         }
     }
-
-    pub fn draw(&mut self, d: &mut RaylibDrawHandle) {
-        let cell_size = self.grid.cell_size as i32;
-        let screen_offset_x = self.screen_offset_x;
-        let screen_offset_y = self.screen_offset_y;
-
-        for cell in &mut self.grid {
-            let x = cell.x as i32;
-            let y = cell.y as i32;
-
-            match cell.terrain {
-                Terrain::Obstacle => {
-                    d.draw_rectangle(
-                        screen_offset_x + (x * cell_size),
-                        screen_offset_y + (y * cell_size),
-                        cell_size,
-                        cell_size,
-                        OBSTACLE_COLOR,
-                    );
-                }
-                Terrain::Border => {
-                    if self.show_border {
-                        d.draw_rectangle(
-                            screen_offset_x + (x * cell_size),
-                            screen_offset_y + (y * cell_size),
-                            cell_size,
-                            cell_size,
-                            OBSTACLE_COLOR,
-                        );
-                    }
-                }
-                Terrain::Food => {
-                    d.draw_rectangle(
-                        screen_offset_x + (x * cell_size),
-                        screen_offset_y + (y * cell_size),
-                        cell_size,
-                        cell_size,
-                        FOOD_COLOR,
-                    );
-                }
-                Terrain::Empty | Terrain::Colony => {
-                    // Draw standard empty background
-                    // Colonies are drawn directly on screen.
-                    d.draw_rectangle(
-                        screen_offset_x + (x * cell_size),
-                        screen_offset_y + (y * cell_size),
-                        cell_size,
-                        cell_size,
-                        BACKGROUND_COLOR,
-                    );
-                }
-                Terrain::Invalid => unreachable!("we should never try to draw an invalid cell"),
-            };
-
-            if self.show_to_home_pheromones && cell.to_home > 0.0 {
-                let brightness = ((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 0.8;
-                let color = PHEROMONE_FORAGING_COLOR.brightness(brightness);
-                d.draw_rectangle(
-                    screen_offset_x + (x * cell_size + cell_size / 2),
-                    screen_offset_y + (y * cell_size + cell_size / 2),
-                    cell_size,
-                    cell_size,
-                    color,
-                );
-            }
-            if self.show_to_food_pheromones && cell.to_food > 0.0 {
-                let brightness = ((cell.to_food / MAX_RGBA_VALUE) * 2.0) - 0.8;
-                let color = PHEROMONE_RETURNING_FOOD_COLOR.brightness(brightness);
-                d.draw_rectangle(
-                    screen_offset_x + (x * cell_size + cell_size / 2),
-                    screen_offset_y + (y * cell_size + cell_size / 2),
-                    cell_size,
-                    cell_size,
-                    color,
-                );
-            }
-
-            if self.show_grid {
-                if cell.is_border() {
-                    continue;
-                }
-                let thickness = 0.5;
-                let line_color = Color::new(80, 80, 80, 255);
-                let rect = Rectangle::new(
-                    (screen_offset_x + (x * cell_size)) as f32,
-                    (screen_offset_y + (y * cell_size)) as f32,
-                    cell_size as f32,
-                    cell_size as f32,
-                );
-                d.draw_rectangle_lines_ex(rect, thickness, line_color);
-            }
-        }
-
-        // FIRST : Draw ants
-        if self.show_ants {
-            for ant in &self.colony.ants {
-                ant.draw(d, self.show_ant_sensors, screen_offset_x, screen_offset_y);
-            }
-        }
-        // SECOND : Draw colony
-        self.colony.draw(d, screen_offset_x, screen_offset_y);
-    }
-
-    pub fn get_cell(&self, x: u32, y: u32) -> Option<&Cell> {
-        self.grid.get_cell(x, y)
-    }
-
-    #[allow(dead_code)]
-    pub fn get_cell_mut(&mut self, x: u32, y: u32) -> Option<&mut Cell> {
-        self.grid.get_cell_mut(x, y)
-    }
-
-    #[allow(dead_code)]
-    pub fn get_cell_from_position(&self, position: Vector2) -> Option<&Cell> {
-        self.grid.get_cell_from_position(position)
-    }
-
-    #[allow(dead_code)]
-    pub fn get_cell_mut_from_position(&mut self, position: Vector2) -> Option<&mut Cell> {
-        self.grid.get_cell_mut_from_position(position)
-    }
+    */
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -515,3 +247,4 @@ mod tests {
         //assert!((cell_single_step.to_food - cell_multi_step.to_food).abs() < epsilon);
     }
 }
+*/

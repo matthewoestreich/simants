@@ -6,15 +6,15 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 12_000;
-pub const PERCENT_OF_EXPLORER_ANTS: f32 = 1.0;
+pub const NUM_ANTS: usize = 17_000;
+pub const PERCENT_OF_EXPLORER_ANTS: f32 = 0.5;
 // When an explorer ants time to explore runs out, it goes exploring.
 // We pick a random number in this range so not all ants go exploring at the same time.
 pub const EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE: Range<f32> = 5.0..10.0;
 // We multiply CELL_SIZE by this value, which determines how large ants are.
-pub const ANT_SIZE_MULTIPLIER: f32 = 2.0;
+pub const ANT_SIZE_MULTIPLIER: f32 = 1.0;
 // Pixels per second
-pub const ANT_MAX_SPEED: f32 = 40.0; // 40.0 seems to be stable
+pub const ANT_MAX_SPEED: f32 = 10.0; // 40.0 seems to be stable
 pub const ANT_SPEED_WOBBLE_PERCENT: f32 = 25.0;
 pub const ANT_ACCELERATION_RATE: f32 = 5.0;
 // Ants carrying food are naturally slower. If this value is 0.70, it will slow the ant down 30%
@@ -48,6 +48,7 @@ pub const ANT_SENSOR_DISTANCE: u32 = 2;
 
 pub const PHEROMONE_DECAY_RATE: f32 = 0.003; // 0.005 seems to be stable
 pub const FOOD_CELL_MAX_AMOUNT: f32 = 100_000.0;
+pub const MAX_RGBA_VALUE: f32 = 255.0;
 
 /* ----------------------------------- */
 /* ------- Hide/Show Entities -------- */
@@ -66,15 +67,13 @@ pub const FOOD_RADIUS: f32 = 16.0;
 /* ----------------------------------- */
 
 pub const TITLE: &str = "Ant Simulation";
-// If either SCREEN_WIDTH or SCREEN_HEIGHT is <= 0 we use full screen width
-pub const SCREEN_WIDTH: i32 = 1200;
-// If either SCREEN_WIDTH or SCREEN_HEIGHT is <= 0 we use full screen width
-pub const SCREEN_HEIGHT: i32 = 800;
-pub const GRID_WIDTH: u32 = 1200;
-pub const GRID_HEIGHT: u32 = 800;
-// N x N pixels
-pub const CELL_SIZE: u32 = 4;
-pub const MAX_RGBA_VALUE: f32 = 255.0;
+pub const WINDOW_WIDTH: i32 = 1200;
+pub const WINDOW_HEIGHT: i32 = 800;
+
+pub const PIXELS_PER_CELL: u32 = 4;
+
+pub const GRID_COLS: u32 = WINDOW_WIDTH as u32 / PIXELS_PER_CELL;
+pub const GRID_ROWS: u32 = WINDOW_HEIGHT as u32 / PIXELS_PER_CELL;
 
 /* ----------------------------------- */
 /* ------- Color Options ------------- */

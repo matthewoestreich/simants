@@ -1,19 +1,15 @@
 use crate::{
     map::{Cell, CellSample, Grid, Terrain},
     settings::{
-        ANT_ACCELERATION_RATE, ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT, ANT_FORAGING_COLOR,
-        ANT_HARVEST_AMOUNT_RANGE, ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
+        ANT_ACCELERATION_RATE, ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT, ANT_HARVEST_AMOUNT_RANGE,
+        ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
         ANT_OBSTACLE_PANIC_ANGLE_RANGE, ANT_PAUSE_FOR_RANGE_IN_SEC, ANT_PAUSE_PROBABILITY,
-        ANT_RETURNING_FOOD_COLOR, ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE, ANT_SIZE_MULTIPLIER,
-        ANT_SPEED_WOBBLE_PERCENT, ANT_TURN_ANGLE, CELL_SIZE, COLONY_COLOR,
-        EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE, FOOD_COLOR,
+        ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE, ANT_SPEED_WOBBLE_PERCENT, ANT_TURN_ANGLE,
+        EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE,
     },
 };
 use rand::RngExt as _;
-use raylib::{
-    ffi::{Color, Vector2},
-    prelude::{RaylibDraw as _, RaylibDrawHandle},
-};
+use raylib::ffi::Vector2;
 
 /* ---------------------------------------------------------------- */
 /* -------------- AntColony --------------------------------------- */
@@ -72,14 +68,6 @@ impl AntColony {
             self.ants.insert(i, ant);
         }
     }
-
-    pub fn draw(&self, d: &mut RaylibDrawHandle, offset_x: i32, offset_y: i32) {
-        let color = COLONY_COLOR;
-        let ox = offset_x as f32;
-        let oy = offset_y as f32;
-        let position_with_offset = Vector2::new(ox + self.position.x, oy + self.position.y);
-        d.draw_circle_v(position_with_offset, self.radius, color);
-    }
 }
 
 /* ---------------------------------------------------------------- */
@@ -96,9 +84,9 @@ pub struct Sensor {
 
 #[derive(Default, Debug, Clone)]
 pub struct Sensors {
-    left: Sensor,
-    center: Sensor,
-    right: Sensor,
+    pub left: Sensor,
+    pub center: Sensor,
+    pub right: Sensor,
 }
 
 /* ---------------------------------------------------------------- */
@@ -166,8 +154,12 @@ impl Ant {
         }
     }
 
+    pub fn get_sensors(&self) -> &Sensors {
+        &self.sensors
+    }
+
     /// Updates current sensor samples and returns current cell
-    pub fn sense_environment<'a>(&mut self, grid: &'a mut Grid) -> &'a mut Cell {
+    pub fn sense_environment(&mut self, grid: &Grid) {
         // Rotate forward heading vector to find antenna paths
         let center_dir = if self.velocity.length_sqr() > 0.0 {
             self.velocity.normalize()
@@ -178,7 +170,8 @@ impl Ant {
         let left_dir = center_dir.rotate(-ANT_SENSOR_ANGLE);
         let right_dir = center_dir.rotate(ANT_SENSOR_ANGLE);
 
-        let sensor_distance = (grid.cell_size * ANT_SENSOR_DISTANCE) as f32;
+        let sensor_distance = (ANT_SENSOR_DISTANCE) as f32;
+
         let left_loc = self.position + (left_dir * sensor_distance);
         let center_loc = self.position + (center_dir * sensor_distance);
         let right_loc = self.position + (right_dir * sensor_distance);
@@ -196,8 +189,8 @@ impl Ant {
             reading: grid.sample_position_with_pheromone_bias(right_loc, self.state),
         };
 
-        grid.get_cell_mut_from_position(self.position)
-            .expect("current position to always be valid")
+        //grid.get_cell_mut_from_position(self.position)
+        //    .expect("current position to always be valid")
     }
 
     pub fn calculate_next_position(&mut self, delta_time: f32) -> Option<Vector2> {
@@ -488,53 +481,6 @@ impl Ant {
     /// If `probability_of_pausing` === 0.2 then there is a 20% chance o pausing.
     pub fn should_pause(&mut self, probability_of_pausing: f64) -> bool {
         !self.is_paused() && self.rng.random::<f64>() < probability_of_pausing
-    }
-
-    pub fn draw(&self, d: &mut RaylibDrawHandle, draw_sensors: bool, offset_x: i32, offset_y: i32) {
-        let (ant_color, mut sensor_color) = match self.state {
-            AntState::Foraging => (ANT_FORAGING_COLOR, FOOD_COLOR),
-            AntState::ReturningFood => (ANT_RETURNING_FOOD_COLOR, COLONY_COLOR),
-        };
-
-        let forward = self.velocity.normalize();
-        let right = Vector2::new(-forward.y, forward.x);
-
-        let ant_length = CELL_SIZE as f32 * ANT_SIZE_MULTIPLIER;
-        let ant_width = ant_length / 2.0;
-
-        let ox = offset_x as f32;
-        let oy = offset_y as f32;
-
-        let ant_pos = Vector2::new(ox + self.position.x, oy + self.position.y);
-        let spear = ant_pos + (forward * (ant_length / 2.0));
-        let left_back = ant_pos - (forward * (ant_length / 2.0)) - (right * (ant_width / 2.0));
-        let right_back = ant_pos - (forward * (ant_length / 2.0)) + (right * (ant_width / 2.0));
-        d.draw_triangle(spear, left_back, right_back, ant_color);
-
-        if matches!(self.kind, AntKind::Explorer { .. }) {
-            d.draw_triangle_lines(spear, left_back, right_back, Color::YELLOW);
-        }
-
-        if draw_sensors {
-            sensor_color.a = 150; // semi-transparent
-            let size = Vector2::new(2.0, 2.0);
-
-            if let Some(l) = self.sensors.left.location {
-                let pos = Vector2::new(ox + l.x, oy + l.y);
-                d.draw_line_v(ant_pos, pos, sensor_color);
-                d.draw_rectangle_v(pos, size, sensor_color);
-            }
-            if let Some(c) = self.sensors.center.location {
-                let pos = Vector2::new(ox + c.x, oy + c.y);
-                d.draw_line_v(ant_pos, pos, sensor_color);
-                d.draw_rectangle_v(pos, size, sensor_color);
-            }
-            if let Some(r) = self.sensors.right.location {
-                let pos = Vector2::new(ox + r.x, oy + r.y);
-                d.draw_line_v(ant_pos, pos, sensor_color);
-                d.draw_rectangle_v(pos, size, sensor_color);
-            }
-        }
     }
 }
 

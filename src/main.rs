@@ -3,42 +3,51 @@
 
 mod ant;
 mod map;
+mod render;
 mod settings;
 mod world;
 
 use crate::{
     ant::AntColony,
+    map::Grid,
+    render::{Renderer, Viewport},
     settings::{
-        BACKGROUND_COLOR, CELL_SIZE, COLONY_RADIUS, GRID_HEIGHT, GRID_WIDTH, NUM_ANTS,
-        PERCENT_OF_EXPLORER_ANTS, SCREEN_HEIGHT, SCREEN_WIDTH, SHOW_ANT_SENSORS, SHOW_ANTS,
-        SHOW_BORDER, SHOW_GRID_LINES, SHOW_PHEROMONES, TITLE,
+        BACKGROUND_COLOR, COLONY_RADIUS, GRID_COLS, GRID_ROWS, NUM_ANTS, PERCENT_OF_EXPLORER_ANTS,
+        PIXELS_PER_CELL, TITLE, WINDOW_HEIGHT, WINDOW_WIDTH,
     },
     world::World,
 };
 use raylib::{
-    RaylibHandle,
-    ffi::{Camera2D, Color, KeyboardKey, MouseButton, Vector2},
+    ffi::{Camera2D, Color, Vector2},
     prelude::{RaylibDraw as _, RaylibMode2DExt as _},
 };
 
 fn main() {
     assert!(
-        SCREEN_WIDTH > 0 && SCREEN_HEIGHT > 0,
-        "expected screen dimensions to be > 0 : SCREEN_WIDTH={SCREEN_WIDTH} | SCREEN_HEIGHT={SCREEN_HEIGHT}"
+        WINDOW_WIDTH > 0 && WINDOW_HEIGHT > 0,
+        "expected screen dimensions to be > 0 : SCREEN_WIDTH={WINDOW_WIDTH} | SCREEN_HEIGHT={WINDOW_HEIGHT}"
     );
     assert!(
-        GRID_WIDTH <= SCREEN_WIDTH as u32 && GRID_HEIGHT <= SCREEN_HEIGHT as u32,
-        "expected grid dimensions to be <= screen dimensions : GRID_WIDTH={GRID_WIDTH} | GRID_HEIGHT={GRID_HEIGHT} | SCREEN_WIDTH={SCREEN_WIDTH} | SCREEN_HEIGHT={SCREEN_HEIGHT}"
+        GRID_COLS <= WINDOW_WIDTH as u32 && GRID_ROWS <= WINDOW_HEIGHT as u32,
+        "expected grid dimensions to be <= screen dimensions : GRID_WIDTH={GRID_COLS} | GRID_HEIGHT={GRID_ROWS} | SCREEN_WIDTH={WINDOW_WIDTH} | SCREEN_HEIGHT={WINDOW_HEIGHT}"
     );
 
     let (mut rl, thread) = raylib::init()
         .title(TITLE)
-        .size(SCREEN_WIDTH, SCREEN_HEIGHT)
+        .size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .build();
 
-    let colony_position = Vector2::new(GRID_WIDTH as f32 / 8.0, GRID_HEIGHT as f32 / 2.0);
-    let colony_radius = COLONY_RADIUS * CELL_SIZE as f32;
+    let viewport = Viewport {
+        x: 10,
+        y: 10,
+        width: WINDOW_WIDTH - 10,
+        height: WINDOW_HEIGHT - 10,
+    };
 
+    let mut renderer = Renderer::new(viewport, PIXELS_PER_CELL as f32);
+
+    let colony_position = Vector2::new(GRID_COLS as f32 / 8.0, GRID_ROWS as f32 / 2.0);
+    let colony_radius = COLONY_RADIUS * PIXELS_PER_CELL as f32;
     let colony = AntColony::new_with_immediate_spawn(
         NUM_ANTS,
         PERCENT_OF_EXPLORER_ANTS,
@@ -46,59 +55,50 @@ fn main() {
         colony_position,
     );
 
-    let mut world = World::new(
-        rl.get_screen_width(),
-        rl.get_screen_height(),
-        GRID_WIDTH,
-        GRID_HEIGHT,
-        CELL_SIZE,
-        colony,
-        SHOW_GRID_LINES,
-        SHOW_PHEROMONES,
-        SHOW_BORDER,
-        SHOW_ANT_SENSORS,
-        SHOW_ANTS,
-    );
+    let mut grid = Grid::new(GRID_COLS, GRID_ROWS);
+    grid.initialize(&colony);
+
+    let mut world = World::new(grid, colony);
 
     let mut camera = Camera2D::default();
     camera.zoom = 1.0;
 
     rl.set_target_fps(60);
 
-    let mut is_paused = false;
-    let mut is_dragging = false;
-    let mut is_pheromone_mode = false;
-    let mut click_start_pos = Vector2::zero();
+    //let mut is_paused = false;
+    //let mut is_dragging = false;
+    //let mut is_pheromone_mode = false;
+    //let mut click_start_pos = Vector2::zero();
 
     /* --------------------------------------- */
     /* ------------ Game Loop ---------------- */
     /* --------------------------------------- */
     while !rl.window_should_close() {
-        if !is_paused {
-            world.update(rl.get_frame_time());
-        }
+        //if !is_paused {
+        //    world.update(rl.get_frame_time());
+        //}
 
-        handle_key_press(&mut rl, &mut world, &mut is_paused, &mut is_pheromone_mode);
-        handle_mouse_wheel(&mut rl, &mut camera);
-        handle_mouse_click(
-            &mut rl,
-            &mut camera,
-            &mut world,
-            &mut is_dragging,
-            &mut click_start_pos,
-        );
+        //handle_key_press(&mut rl, &mut world, &mut is_paused, &mut is_pheromone_mode);
+        //handle_mouse_wheel(&mut rl, &mut camera);
+        //handle_mouse_click(
+        //    &mut rl,
+        //    &mut camera,
+        //    &mut world,
+        //    &mut is_dragging,
+        //    &mut click_start_pos,
+        //);
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
 
         {
             let mut mode2d = d.begin_mode2D(camera);
-            world.draw(&mut mode2d);
+            renderer.draw_world(&mut world, &mut mode2d);
         }
 
-        if is_pheromone_mode {
-            d.draw_text("PHEROMONE MODE ON", 10, 10, 20, Color::WHITE);
-        }
+        //if is_pheromone_mode {
+        //    d.draw_text("PHEROMONE MODE ON", 10, 10, 20, Color::WHITE);
+        //}
     }
 }
 
@@ -106,6 +106,7 @@ fn main() {
 /* -------------- Helper Functions -------------------------------- */
 /* ---------------------------------------------------------------- */
 
+/*
 fn handle_key_press(
     rl: &mut RaylibHandle,
     world: &mut World,
@@ -230,3 +231,4 @@ fn handle_mouse_click(
         }
     }
 }
+*/
