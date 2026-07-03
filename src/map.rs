@@ -59,8 +59,8 @@ impl Grid {
         let y_range = line_start_y..=line_end_y;
 
         // For drawing food clump
-        let food_center_x = (cols * 3) / 4;
-        let food_center_y = rows / 2;
+        let food_center_x = 225; //(cols * 3) / 4; // 900 / 4
+        let food_center_y = 100; //rows / 2; // 200 / 2 = 100
         let food_radius = FOOD_RADIUS;
 
         for cell in self.cells.iter_mut() {
@@ -84,8 +84,8 @@ impl Grid {
             }
 
             // Marks a cell as food.
-            let food_dx = x as i32 - food_center_x as i32;
-            let food_dy = y as i32 - food_center_y as i32;
+            let food_dx = x as i32 - food_center_x;
+            let food_dy = y as i32 - food_center_y;
             if food_dx * food_dx + food_dy * food_dy <= food_radius as i32 * food_radius as i32 {
                 cell.terrain = Terrain::Food;
                 cell.food = FOOD_CELL_MAX_AMOUNT;

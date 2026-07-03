@@ -10,10 +10,10 @@ mod world;
 use crate::{
     ant::AntColony,
     map::Grid,
-    render::{Renderer, Viewport},
+    render::{Renderer, WorldPanel},
     settings::{
         BACKGROUND_COLOR, COLONY_RADIUS, GRID_COLS, GRID_ROWS, NUM_ANTS, PERCENT_OF_EXPLORER_ANTS,
-        PIXELS_PER_CELL, TITLE, WINDOW_HEIGHT, WINDOW_WIDTH,
+        TITLE, WINDOW_HEIGHT, WINDOW_WIDTH, WORLD_HEIGHT, WORLD_WIDTH,
     },
     world::World,
 };
@@ -37,17 +37,19 @@ fn main() {
         .size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .build();
 
-    let viewport = Viewport {
-        x: 10,
-        y: 10,
-        width: WINDOW_WIDTH - 10,
-        height: WINDOW_HEIGHT - 10,
-    };
+    let world_panel = WorldPanel::new(
+        (WINDOW_WIDTH - WORLD_WIDTH) / 2,
+        (WINDOW_HEIGHT - WORLD_HEIGHT) / 2,
+        WORLD_WIDTH,
+        WORLD_HEIGHT,
+        GRID_COLS,
+        GRID_ROWS,
+    );
 
-    let mut renderer = Renderer::new(viewport, PIXELS_PER_CELL as f32);
+    let mut renderer = Renderer::new(world_panel);
 
     let colony_position = Vector2::new(GRID_COLS as f32 / 8.0, GRID_ROWS as f32 / 2.0);
-    let colony_radius = COLONY_RADIUS * PIXELS_PER_CELL as f32;
+    let colony_radius = COLONY_RADIUS;
     let colony = AntColony::new_with_immediate_spawn(
         NUM_ANTS,
         PERCENT_OF_EXPLORER_ANTS,

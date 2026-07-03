@@ -59,7 +59,7 @@ pub const SHOW_BORDER: bool = false;
 pub const SHOW_PHEROMONES: bool = false;
 pub const SHOW_ANT_SENSORS: bool = false;
 pub const SHOW_GRID_LINES: bool = false;
-pub const COLONY_RADIUS: f32 = 8.0;
+pub const COLONY_RADIUS: f32 = 16.0;
 pub const FOOD_RADIUS: f32 = 16.0;
 
 /* ----------------------------------- */
@@ -67,13 +67,15 @@ pub const FOOD_RADIUS: f32 = 16.0;
 /* ----------------------------------- */
 
 pub const TITLE: &str = "Ant Simulation";
+
 pub const WINDOW_WIDTH: i32 = 1200;
 pub const WINDOW_HEIGHT: i32 = 800;
 
-pub const PIXELS_PER_CELL: u32 = 4;
+pub const WORLD_WIDTH: i32 = 800;
+pub const WORLD_HEIGHT: i32 = 600;
 
-pub const GRID_COLS: u32 = WINDOW_WIDTH as u32 / PIXELS_PER_CELL;
-pub const GRID_ROWS: u32 = WINDOW_HEIGHT as u32 / PIXELS_PER_CELL;
+pub const GRID_COLS: u32 = 300;
+pub const GRID_ROWS: u32 = 200;
 
 /* ----------------------------------- */
 /* ------- Color Options ------------- */
