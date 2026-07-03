@@ -34,13 +34,6 @@ pub struct World {
     pub show_ants: bool,
 }
 
-pub fn is_same_position(position: Vector2, other_position: Vector2, cell_size: u32) -> bool {
-    let half_size = cell_size as f32 / 2.0;
-    let dx = (other_position.x - position.x).abs();
-    let dy = (other_position.y - position.y).abs();
-    dx <= half_size && dy <= half_size
-}
-
 impl World {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -191,42 +184,29 @@ impl World {
             }
 
             let current_cell = ant.sense_environment(&mut self.grid);
+            let is_exploring = ant.explore(delta_time);
 
-            if ant.is_explorer_kind() {
-                if ant.is_exploring() {
-                    ant.decrement_explore_stop_timer(delta_time);
-                    if ant.should_stop_exploring() {
-                        ant.stop_exploring();
-                    }
-                } else {
-                    ant.decrement_explore_start_timer(delta_time);
-                    if ant.should_start_exploring() {
-                        //ant.set_pheromone_tank(ant.get_pheromones_remaining() + 3.5);
-                        ant.start_exploring();
-                    }
-                }
-            }
-
-            // Gather food
-            if !ant.is_exploring() && ant.is_foraging() && current_cell.is_food() {
-                // TODO : clean this up
-                let harvested_amount = ant.harvest(current_cell.food);
-                current_cell.food = (current_cell.food - harvested_amount).max(0.0);
-                ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
-                ant.turn_in_any_direction();
-                continue;
-            }
-
-            // Deliver food to colony
-            if !ant.is_exploring() && ant.is_returning_food() && current_cell.is_colony() {
-                if is_same_position(colony_center, ant.position, self.grid.cell_size) {
-                    self.colony.harvested_food += ant.deliver_food();
+            if !is_exploring {
+                // Gather food
+                if ant.is_foraging() && current_cell.is_food() {
+                    // TODO : clean this up
+                    let harvested_amount = ant.harvest(current_cell.food);
+                    current_cell.food = (current_cell.food - harvested_amount).max(0.0);
                     ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                     ant.turn_in_any_direction();
-                } else {
-                    ant.steer_towards_position(colony_center, delta_time);
+                    continue;
                 }
-                continue;
+                // Deliver food to colony
+                if ant.is_returning_food() && current_cell.is_colony() {
+                    if World::is_same_position(colony_center, ant.position, self.grid.cell_size) {
+                        self.colony.harvested_food += ant.deliver_food();
+                        ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
+                        ant.turn_in_any_direction();
+                    } else {
+                        ant.steer_towards_position(colony_center, delta_time);
+                    }
+                    continue;
+                }
             }
 
             // Place pheromone
@@ -243,9 +223,9 @@ impl World {
             if let Some(next_position) = ant.calculate_next_position(delta_time) {
                 if self.grid.position_is_obstruction(next_position) {
                     ant.turn_around();
-                    continue;
+                } else {
+                    ant.position = next_position;
                 }
-                ant.position = next_position;
             }
         }
     }
@@ -260,6 +240,13 @@ impl World {
             return 0.0;
         }
         amount
+    }
+
+    pub fn is_same_position(position: Vector2, other_position: Vector2, cell_size: u32) -> bool {
+        let half_size = cell_size as f32 / 2.0;
+        let dx = (other_position.x - position.x).abs();
+        let dy = (other_position.y - position.y).abs();
+        dx <= half_size && dy <= half_size
     }
 
     pub fn screen_to_grid_coords(&self, position: Vector2) -> Option<(u32, u32)> {

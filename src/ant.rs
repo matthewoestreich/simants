@@ -120,10 +120,9 @@ pub enum AntState {
 pub enum AntKind {
     #[default]
     Forager,
-    Explorer {
-        start: f32, // seconds remaining til we start exploring
-        stop: f32,  // seconds remaining til we stop exploring
-    },
+    /// `start` = seconds remaining til we start exploring
+    /// `stop` = seconds remaining til we stop exploring
+    Explorer { start: f32, stop: f32 },
 }
 
 /* ---------------------------------------------------------------- */
@@ -139,9 +138,12 @@ pub struct Ant {
     pub state: AntState,
     pub kind: AntKind,
     pub steering_force: Vector2,
+    /// Amount of food we are currently carrying
     pub food: f32,
-    pub total_food_harvested: f32,
-    pub paused: f32, // Amount of time left in pause. 0.0 means we are not paused.
+    /// Amount of food 'this' ant has harvested.
+    pub harvested_amount: f32,
+    /// Amount of time left in pause. 0.0 means we are not paused.
+    pub paused: f32,
 
     pheromone_tank: f32,
     sensors: Sensors,
@@ -362,7 +364,7 @@ impl Ant {
     // Returns amount delivered..
     pub fn deliver_food(&mut self) -> f32 {
         let delivered = self.food;
-        self.total_food_harvested += delivered;
+        self.harvested_amount += delivered;
         self.food = 0.0;
         self.state = AntState::Foraging;
         delivered
@@ -375,6 +377,40 @@ impl Ant {
         } else if self.should_pause(ANT_PAUSE_PROBABILITY) {
             self.paused = self.rng.random_range(ANT_PAUSE_FOR_RANGE_IN_SEC);
         }
+    }
+
+    /// Returns `true` if we are exploring, `false` if not.
+    pub fn explore(&mut self, delta_time: f32) -> bool {
+        let AntKind::Explorer { start, stop } = &mut self.kind else {
+            return false;
+        };
+
+        // We are actively exploring
+        if *stop > 0.0 {
+            *stop -= delta_time;
+
+            if *stop <= 0.0 {
+                *start = self.rng.random_range(5.0..10.0);
+                *stop = 0.0;
+                return false;
+            }
+
+            return true;
+        }
+
+        // Waiting until next exploration period.
+        *start -= delta_time;
+
+        if *start > 0.0 {
+            return false;
+        }
+
+        *start = 0.0;
+        *stop = self.rng.random_range(5.0..10.0);
+        let angle = if rand::random() { -90.0f32 } else { 90.0f32 };
+        self.velocity = self.velocity.rotate(angle.to_radians());
+
+        true
     }
 
     fn get_random_wander_angle(&mut self) -> f32 {
@@ -408,10 +444,6 @@ impl Ant {
         matches!(self.state, AntState::Foraging)
     }
 
-    pub fn is_explorer_kind(&self) -> bool {
-        matches!(self.kind, AntKind::Explorer { .. })
-    }
-
     pub fn is_exploring(&self) -> bool {
         if let AntKind::Explorer { start, stop } = self.kind
             && start <= 0.0
@@ -420,66 +452,6 @@ impl Ant {
             return true;
         }
         false
-    }
-
-    pub fn should_start_exploring(&self) -> bool {
-        if let AntKind::Explorer { start, .. } = self.kind
-            && start <= 0.0
-        {
-            return true;
-        }
-        false
-    }
-
-    pub fn should_stop_exploring(&self) -> bool {
-        if let AntKind::Explorer { stop, .. } = self.kind
-            && stop <= 0.0
-        {
-            return true;
-        }
-        false
-    }
-
-    pub fn decrement_explore_stop_timer(&mut self, by: f32) {
-        if let AntKind::Explorer { ref mut stop, .. } = self.kind {
-            *stop -= by;
-        }
-    }
-
-    pub fn decrement_explore_start_timer(&mut self, by: f32) {
-        if let AntKind::Explorer { ref mut start, .. } = self.kind {
-            *start -= by;
-        }
-    }
-
-    pub fn start_exploring(&mut self) {
-        // Ant is AntKind::Explorer and the 'time left until exploring' is out.
-        if let AntKind::Explorer {
-            ref mut start,
-            ref mut stop,
-        } = self.kind
-        {
-            *start = 0.0;
-            *stop = self.rng.random_range(10.0..45.0);
-        }
-        let a = if rand::random() {
-            -90.0f32.to_radians()
-        } else {
-            90.0f32.to_radians()
-        };
-        self.pheromone_tank += 0.01;
-        self.velocity = self.velocity.rotate(a);
-    }
-
-    pub fn stop_exploring(&mut self) {
-        if let AntKind::Explorer {
-            ref mut start,
-            ref mut stop,
-        } = self.kind
-        {
-            *start = self.rng.random_range(5.0..10.0);
-            *stop = 0.0;
-        }
     }
 
     pub fn is_returning_food(&self) -> bool {
@@ -508,10 +480,7 @@ impl Ant {
     }
 
     pub fn turn_in_any_direction(&mut self) {
-        let angle = self
-            .rng // Wander randomly
-            .random_range(-360.0f32..360.0f32)
-            .to_radians();
+        let angle = self.rng.random_range(-360.0f32..360.0f32).to_radians();
         self.velocity = self.velocity.rotate(angle);
     }
 
@@ -552,17 +521,17 @@ impl Ant {
 
             if let Some(l) = self.sensors.left.location {
                 let pos = Vector2::new(ox + l.x, oy + l.y);
-                d.draw_line_v(ant_pos, pos, sensor_color); // antennae 'whiskers'
+                d.draw_line_v(ant_pos, pos, sensor_color);
                 d.draw_rectangle_v(pos, size, sensor_color);
             }
             if let Some(c) = self.sensors.center.location {
                 let pos = Vector2::new(ox + c.x, oy + c.y);
-                d.draw_line_v(ant_pos, pos, sensor_color); // antennae 'whiskers'
+                d.draw_line_v(ant_pos, pos, sensor_color);
                 d.draw_rectangle_v(pos, size, sensor_color);
             }
             if let Some(r) = self.sensors.right.location {
                 let pos = Vector2::new(ox + r.x, oy + r.y);
-                d.draw_line_v(ant_pos, pos, sensor_color); // antennae 'whiskers'
+                d.draw_line_v(ant_pos, pos, sensor_color);
                 d.draw_rectangle_v(pos, size, sensor_color);
             }
         }
@@ -608,7 +577,7 @@ impl std::fmt::Display for Ant {
         writeln!(
             f,
             "  food: {{ carrying: {}, total_harvested: {} }}",
-            self.food, self.total_food_harvested
+            self.food, self.harvested_amount
         )?;
         writeln!(f, "  state: {:?}", self.state)?;
         writeln!(f, "  kind: {:?}", self.kind)?;
