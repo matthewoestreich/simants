@@ -74,14 +74,26 @@ fn main() {
     let mut is_dragging = false;
     let mut is_pheromone_mode = false;
     let mut click_start_pos = Vector2::zero();
-    let mut fast_forward_multiplier = 1; // 1 is normal speed
+    let mut fast_forward_multiplier = 1.0; // 1 is normal speed
 
     /* --------------------------------------- */
     /* ------------ Game Loop ---------------- */
     /* --------------------------------------- */
     while !rl.window_should_close() {
         if !is_paused {
-            let dt = rl.get_frame_time() * fast_forward_multiplier as f32;
+            let dt = rl.get_frame_time() * fast_forward_multiplier;
+
+            if fast_forward_multiplier > 1.0 {
+                // Fast-forward splits the work into stable, tiny slices!
+                // Example: at 10x speed, we loop 10 times, passing a safe 1x delta_time each loop
+                let steps = fast_forward_multiplier.floor() as i32;
+                let step_dt = dt; // Pass a normal frame time slice to keep math stable
+
+                for _ in 0..steps {
+                    world.update(step_dt);
+                }
+            }
+
             world.update(dt);
         }
 
@@ -130,7 +142,7 @@ fn main() {
         if is_pheromone_mode {
             d.draw_text("PHEROMONE MODE ON", 10, 10, 20, Color::WHITE);
         }
-        if fast_forward_multiplier > 1 {
+        if fast_forward_multiplier > 1.0 {
             d.draw_text(
                 &format!(">> x{fast_forward_multiplier}"),
                 10,
@@ -151,7 +163,7 @@ fn handle_key_press(
     renderer: &mut Renderer,
     is_paused: &mut bool,
     is_pheromone_mode: &mut bool,
-    fast_forward: &mut i32,
+    fast_forward: &mut f32,
 ) {
     if *is_pheromone_mode {
         if rl.is_key_pressed(KeyboardKey::KEY_P) {
@@ -164,11 +176,11 @@ fn handle_key_press(
             renderer.toggle_show_pheromones("ALL");
         }
     } else if rl.is_key_pressed(KeyboardKey::KEY_F) {
-        *fast_forward += 1;
-        if *fast_forward == 6 {
-            *fast_forward = 10;
-        } else if *fast_forward >= 10 {
-            *fast_forward = 1;
+        *fast_forward += 1.0;
+        if *fast_forward == 6.0 {
+            *fast_forward = 10.0;
+        } else if *fast_forward >= 10.0 {
+            *fast_forward = 1.0;
         }
     } else if rl.is_key_pressed(KeyboardKey::KEY_A) {
         renderer.toggle_show_ants();
