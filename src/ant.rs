@@ -1,5 +1,6 @@
 use crate::{
     map::{Cell, CellSample, Grid, Terrain},
+    reynolds::Navigation,
     settings::{
         ANT_ACCELERATION_RATE, ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT, ANT_HARVEST_AMOUNT_RANGE,
         ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
@@ -126,12 +127,13 @@ pub enum AntKind {
 #[derive(Default, Debug, Clone)]
 pub struct Ant {
     pub id: i32,
-    pub position: Vector2,
-    pub velocity: Vector2,
-    pub speed: f32,
+    pub navigator: Navigation,
+    //pub position: Vector2,
+    //pub velocity: Vector2,
+    //pub speed: f32,
     pub state: AntState,
     pub kind: AntKind,
-    pub steering_force: Vector2,
+    //pub steering_force: Vector2,
     /// Amount of food we are currently carrying
     pub food: f32,
     /// Amount of food 'this' ant has harvested.
@@ -151,14 +153,22 @@ impl Ant {
     pub fn new(position: Vector2) -> Self {
         let mut rng = rand::rng();
         let forward_direction = rng.random_range(0.0f32.to_radians()..360.0f32.to_radians());
+        let vel = Vector2::new(forward_direction.cos(), forward_direction.sin());
 
         Self {
-            position,
+            //position,
             rng,
-            speed: ANT_MAX_SPEED,
+            navigator: Navigation::new(
+                position,
+                vel,
+                ANT_TURN_ANGLE,
+                ANT_MAX_SPEED,
+                ANT_MAX_TURN_FORCE,
+            ),
+            //speed: ANT_MAX_SPEED,
             pheromone_tank: ANT_MAX_PHEROMONE_CAPACITY,
-            velocity: Vector2::new(forward_direction.cos(), forward_direction.sin())
-                * ANT_MAX_SPEED,
+            //velocity: Vector2::new(forward_direction.cos(), forward_direction.sin())
+            //    * ANT_MAX_SPEED,
             ..Self::default()
         }
     }
@@ -170,8 +180,8 @@ impl Ant {
     /// Updates current sensor samples and returns current cell
     pub fn sense_environment<'a>(&mut self, grid: &'a mut Grid) -> &'a mut Cell {
         // Rotate forward heading vector to find antenna paths
-        let center_dir = if self.velocity.length_sqr() > 0.0 {
-            self.velocity.normalize()
+        let center_dir = if self.navigator.velocity.length_sqr() > 0.0 {
+            self.navigator.velocity.normalize()
         } else {
             Vector2::new(1.0, 0.0) // Fallback heading
         };
@@ -180,9 +190,9 @@ impl Ant {
         let right_dir = center_dir.rotate(ANT_SENSOR_ANGLE.to_radians());
 
         let sensor_distance = ANT_SENSOR_DISTANCE as f32;
-        let left_loc = self.position + (left_dir * sensor_distance);
-        let center_loc = self.position + (center_dir * sensor_distance);
-        let right_loc = self.position + (right_dir * sensor_distance);
+        let left_loc = self.navigator.position + (left_dir * sensor_distance);
+        let center_loc = self.navigator.position + (center_dir * sensor_distance);
+        let right_loc = self.navigator.position + (right_dir * sensor_distance);
 
         self.sensors.left = Sensor {
             location: Some(left_loc),
@@ -197,11 +207,30 @@ impl Ant {
             reading: grid.sample_position_with_pheromone_bias(right_loc, self.state),
         };
 
-        grid.get_cell_mut(self.position.x as u32, self.position.y as u32)
-            .expect("current position to always be valid")
+        grid.get_cell_mut(
+            self.navigator.position.x as u32,
+            self.navigator.position.y as u32,
+        )
+        .expect("current position to always be valid, ant: {self:?}")
     }
 
     pub fn calculate_next_position(&mut self, delta_time: f32) -> Option<Vector2> {
+        if self.is_exploring() {
+            Some(self.navigator.wander(delta_time))
+        } else if self.is_foraging()
+            && let Some(pos) = self.steer_towards_terrain(Terrain::Food)
+        {
+            Some(self.navigator.seek(pos, delta_time))
+        } else if self.is_returning_food()
+            && let Some(pos) = self.steer_towards_terrain(Terrain::Colony)
+        {
+            Some(self.navigator.seek(pos, delta_time))
+        } else if let Some(pos) = self.steer_towards_pheromone() {
+            Some(self.navigator.seek(pos, delta_time))
+        } else {
+            Some(self.navigator.wander(delta_time))
+        }
+        /*
         let steering_angle = {
             if self.is_exploring() {
                 self.get_random_wander_angle().to_radians()
@@ -235,6 +264,7 @@ impl Ant {
         self.apply_steering(steering_angle, delta_time);
         self.apply_speed_wobble(ANT_MAX_SPEED, delta_time);
         Some(self.position + self.velocity * delta_time)
+        */
     }
 
     /// Uses ants sensor readings to determine if the provided terrain was even sensed, and if
@@ -242,82 +272,70 @@ impl Ant {
     /// For every sensor that sensed provided terrain, we compare their values and return the
     /// strongest value.
     // If the provided terrain is not sensed we return None and thereore do not change steering.
-    fn steer_towards_terrain(&self, t: Terrain) -> Option<f32> {
+    fn steer_towards_terrain(&self, t: Terrain) -> Option<Vector2> {
         let left = self.sensors.left.reading;
         let center = self.sensors.center.reading;
         let right = self.sensors.right.reading;
 
         // Use a negative value as a "flag" for if the expected terrain was even found.
         let mut strongest = -1.0;
-        let mut angle = None;
+        //let mut angle = None;
+        let mut next_position = None;
 
         if left.terrain == t {
             strongest = left.target_pheromone;
-            angle = Some(-ANT_SENSOR_ANGLE);
+            next_position = self.sensors.left.location;
+            //angle = Some(-ANT_SENSOR_ANGLE);
         }
         if center.terrain == t && (strongest < 0.0 || center.target_pheromone > strongest) {
             strongest = center.target_pheromone;
-            angle = Some(0.0f32);
+            next_position = self.sensors.center.location;
+            //angle = Some(0.0f32);
         }
         if right.terrain == t {
             #[allow(unused_assignments)]
             if strongest < 0.0 || right.target_pheromone > strongest {
                 strongest = right.target_pheromone;
-                angle = Some(ANT_SENSOR_ANGLE);
+                next_position = self.sensors.right.location;
+                //angle = Some(ANT_SENSOR_ANGLE);
             }
         }
 
-        angle
+        next_position
+        // angle
     }
 
     /// VALUE ALREADY RETURNED IN RDIANS!!!!
     /// Steers towards strongest target pheromone. If the strongest value is still 0.0,
     /// it means we did not sense the target pheromone, so we return None
-    fn steer_towards_pheromone(&self) -> Option<f32> {
+    fn steer_towards_pheromone(&self) -> Option<Vector2> {
         let left = self.sensors.left.reading.target_pheromone;
         let center = self.sensors.center.reading.target_pheromone;
         let right = self.sensors.right.reading.target_pheromone;
 
         // Prefer center (the '>=' comparison)
         if center > 0.0 && center >= left && center >= right {
-            if self.is_returning_food() {
-                println!("steer_towards_pheromone : center wins : 0.0");
-            }
-            return Some(0.0f32);
+            return self.sensors.center.location;
         }
         if left > right {
-            if self.is_returning_food() {
-                println!("steer_towards_pheromone : left wins : -ANT_SENSOR_ANGLE");
-            }
-            return Some(-ANT_SENSOR_ANGLE);
+            return self.sensors.left.location;
         }
         if right > left {
-            if self.is_returning_food() {
-                println!("steer_towards_pheromone : right wins : ANT_SENSOR_ANGLE");
-            }
-            return Some(ANT_SENSOR_ANGLE);
+            return self.sensors.right.location;
         }
         // If left and right are equal, and at least one of them is > 0.0 (implicitly making both
         // of them > 0.0), randomly pick one.
         if left > 0.0 && left == right {
             if rand::random() {
-                if self.is_returning_food() {
-                    println!("steer_towards_pheromone : left==right : -ANT_SENSOR_ANGLE");
-                }
-                return Some(-ANT_SENSOR_ANGLE);
+                return self.sensors.left.location;
             }
-            if self.is_returning_food() {
-                println!("steer_towards_pheromone : left==right : ANT_SENSOR_ANGLE");
-            }
-            return Some(ANT_SENSOR_ANGLE);
+            return self.sensors.right.location;
         }
 
-        if self.is_returning_food() {
-            println!("steer_towards_pheromone : NO winner : None");
-        }
         None // They're all 0s, target pheromone was not sensed
     }
 
+    /*
     pub fn apply_steering(&mut self, steering_angle: f32, delta_time: f32) {
         let sa_rad = steering_angle.to_radians();
         if self.is_returning_food() {
@@ -364,7 +382,9 @@ impl Ant {
         //    }
         //}
     }
+    */
 
+    /*
     pub fn apply_speed_wobble(&mut self, base_speed: f32, delta_time: f32) {
         match self.state {
             AntState::Foraging => {
@@ -389,7 +409,9 @@ impl Ant {
             self.speed = 0.0;
         }
     }
+    */
 
+    /*
     pub fn steer_towards_position(&mut self, target: Vector2, delta_time: f32) {
         let to_target = target - self.position;
         if to_target.length_sqr() <= 0.001 {
@@ -412,6 +434,7 @@ impl Ant {
         self.apply_steering(steering_angle, delta_time);
         self.position += self.velocity * delta_time;
     }
+    */
 
     // Gets a random number from ANT_HARVEST_AMOUNT_RANGE and takes it from
     // capacity_to_harvest_from, then returns amount harvested
@@ -479,8 +502,8 @@ impl Ant {
 
         *start = 0.0;
         *stop = self.rng.random_range(5.0..10.0);
-        let angle = if rand::random() { -90.0f32 } else { 90.0f32 };
-        self.velocity = self.velocity.rotate(angle.to_radians());
+
+        _ = self.navigator.wander(delta_time);
 
         true
     }
@@ -540,20 +563,12 @@ impl Ant {
         };
     }
 
-    pub fn turn_around(&mut self) {
-        self.velocity *= -1.0;
-        let panic_angle = self.rng.random_range(
-            ANT_OBSTACLE_PANIC_ANGLE_MIN.to_radians()..ANT_OBSTACLE_PANIC_ANGLE_MAX.to_radians(),
-        );
-        self.velocity = self.velocity.rotate(panic_angle);
-    }
-
     pub fn turn_in_any_direction(&mut self) {
-        self.velocity *= -1.0;
+        self.navigator.velocity *= -1.0;
         let angle = self
             .rng
             .random_range(0.0f32.to_radians()..360.0f32.to_radians());
-        self.velocity = self.velocity.rotate(angle);
+        self.navigator.velocity = self.navigator.velocity.rotate(angle);
     }
 
     /// `probability_of_pausing` should be >= 0.0 and <= 1.0.
@@ -567,7 +582,7 @@ impl Ant {
 
 impl Ant {
     pub fn is_clicked(&self, mouse_screen_pos: Vector2, click_radius: f32) -> bool {
-        let distance_squared = mouse_screen_pos.distance_sqr(self.position);
+        let distance_squared = mouse_screen_pos.distance_sqr(self.navigator.position);
         let click_radius_squared = click_radius * click_radius;
         distance_squared <= click_radius_squared
     }
@@ -580,17 +595,18 @@ impl std::fmt::Display for Ant {
         writeln!(
             f,
             "  position: {{ x: {}, y: {} }}",
-            self.position.x, self.position.y
+            self.navigator.position.x, self.navigator.position.y
         )?;
         writeln!(
             f,
             "  velocity: {{ x: {}, y: {} }}",
-            self.velocity.x, self.velocity.y
+            self.navigator.velocity.x, self.navigator.velocity.y
         )?;
         writeln!(
             f,
             "  speed: {{ units: {}, cm/s: {} }}",
-            self.speed, self.real_speed_cm_s
+            self.navigator.current_speed(),
+            self.real_speed_cm_s
         )?;
         writeln!(f, "  pheromone_tank: {}", self.pheromone_tank)?;
         writeln!(
@@ -603,7 +619,7 @@ impl std::fmt::Display for Ant {
         writeln!(
             f,
             "  steering_force: {{ x: {}, y: {} }}",
-            self.steering_force.x, self.steering_force.y
+            self.navigator.current_steering_force.x, self.navigator.current_steering_force.y
         )?;
 
         writeln!(f, "  sensors: [")?;

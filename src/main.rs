@@ -4,6 +4,7 @@
 mod ant;
 mod map;
 mod render;
+mod reynolds;
 mod settings;
 mod world;
 

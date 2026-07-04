@@ -42,18 +42,21 @@ impl World {
                     let harvested_amount = ant.harvest(current_cell.food);
                     current_cell.food = (current_cell.food - harvested_amount).max(0.0);
                     ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
-                    ant.turn_in_any_direction();
+                    //ant.turn_in_any_direction();
+                    ant.navigator.turn_around();
                     continue;
                 }
                 // Deliver food to colony
                 if ant.is_returning_food() && current_cell.is_colony() {
                     // If ant is at colony center
-                    if ant.position.distance_sqr(colony_center) <= 0.1 {
+                    if ant.navigator.position.distance_sqr(colony_center) <= 0.1 {
                         self.colony.harvested_food += ant.deliver_food();
                         ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
-                        ant.turn_in_any_direction();
+                        //ant.turn_in_any_direction();
+                        ant.navigator.turn_around();
                     } else {
-                        ant.steer_towards_position(colony_center, delta_time);
+                        _ = ant.navigator.seek(colony_center, delta_time);
+                        //ant.steer_towards_position(colony_center, delta_time);
                     }
                     continue;
                 }
@@ -75,16 +78,16 @@ impl World {
                 if let Some(c) = self.grid.get_cell(cell_pos.0, cell_pos.1)
                     && c.is_obstruction()
                 {
-                    ant.turn_around();
+                    ant.navigator.turn_around();
                 } else {
-                    let distance_traveled_cm = ant.position.distance(ant.last_position);
+                    let distance_traveled_cm = ant.navigator.position.distance(ant.last_position);
                     if delta_time > 0.0 {
                         ant.real_speed_cm_s = distance_traveled_cm / delta_time;
                     } else {
                         ant.real_speed_cm_s = 0.0;
                     }
-                    ant.last_position = ant.position;
-                    ant.position = next_position;
+                    ant.last_position = ant.navigator.position;
+                    ant.navigator.position = next_position;
                 }
             }
         }

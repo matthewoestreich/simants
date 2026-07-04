@@ -141,13 +141,13 @@ impl Renderer {
             ant_color = Color::PURPLE;
         }
 
-        let forward = ant.velocity.normalize();
+        let forward = ant.navigator.velocity.normalize();
         let right = Vector2::new(-forward.y, forward.x);
 
         let length = ANT_LENGTH;
         let width = ANT_WIDTH;
 
-        let pos = ant.position;
+        let pos = ant.navigator.position;
 
         let spear_pos = pos + forward * (length * 0.5);
         let left_back_pos = pos - forward * (length * 0.5) - right * (width * 0.5);
