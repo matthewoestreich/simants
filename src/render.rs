@@ -2,8 +2,10 @@ use crate::{
     ant::{Ant, AntColony, AntKind, AntState},
     map::{Grid, Terrain},
     settings::{
-        ANT_FORAGING_COLOR, ANT_RETURNING_FOOD_COLOR, BACKGROUND_COLOR, COLONY_COLOR, FOOD_COLOR,
-        MAX_RGBA_VALUE, OBSTACLE_COLOR, PHEROMONE_FORAGING_COLOR, PHEROMONE_RETURNING_FOOD_COLOR,
+        ANT_FORAGING_COLOR, ANT_LENGTH, ANT_RETURNING_FOOD_COLOR, ANT_WIDTH, BACKGROUND_COLOR,
+        COLONY_COLOR, FOOD_COLOR, MAX_RGBA_VALUE, OBSTACLE_COLOR, PHEROMONE_FORAGING_COLOR,
+        PHEROMONE_RETURNING_FOOD_COLOR, SHOW_ANT_SENSORS, SHOW_ANTS, SHOW_BORDER, SHOW_GRID_LINES,
+        SHOW_PHEROMONES,
     },
     world::World,
 };
@@ -67,14 +69,20 @@ pub struct Renderer {
     show_to_food_pheromones: bool,
     show_ant_sensors: bool,
     show_border: bool,
+    show_colony: bool,
 }
 
 impl Renderer {
     pub fn new(viewport: Viewport) -> Self {
         Self {
             viewport,
-            show_ants: true,
-            ..Self::default()
+            show_ants: SHOW_ANTS,
+            show_colony: true,
+            show_grid: SHOW_GRID_LINES,
+            show_border: SHOW_BORDER,
+            show_ant_sensors: SHOW_ANT_SENSORS,
+            show_to_home_pheromones: SHOW_PHEROMONES,
+            show_to_food_pheromones: SHOW_PHEROMONES,
         }
     }
 
@@ -107,21 +115,29 @@ impl Renderer {
         self.show_ant_sensors = !self.show_ant_sensors;
     }
 
+    pub fn toggle_show_colony(&mut self) {
+        self.show_colony = !self.show_colony;
+    }
+
     pub fn toggle_show_ants(&mut self) {
         self.show_ants = !self.show_ants;
     }
 
     pub fn draw_ant(&mut self, ant: &Ant, d: &mut impl RaylibDraw, draw_sensors: bool) {
-        let (ant_color, mut sensor_color) = match ant.state {
+        let (mut ant_color, mut sensor_color) = match ant.state {
             AntState::Foraging => (ANT_FORAGING_COLOR, FOOD_COLOR),
             AntState::ReturningFood => (ANT_RETURNING_FOOD_COLOR, COLONY_COLOR),
         };
 
+        if ant.paused > 0.0 {
+            ant_color = Color::PURPLE;
+        }
+
         let forward = ant.velocity.normalize();
         let right = Vector2::new(-forward.y, forward.x);
 
-        let length = 1.0; // * ANT_SIZE_MULTIPLIER;
-        let width = length * 1.0;
+        let length = ANT_LENGTH;
+        let width = ANT_WIDTH;
 
         let pos = ant.position;
 
@@ -170,8 +186,7 @@ impl Renderer {
                 .grid_to_world(Vector2::new(cell.x as f32, cell.y as f32));
 
             let color = match cell.terrain {
-                Terrain::Empty => BACKGROUND_COLOR,
-                Terrain::Colony => Color::ORANGE,
+                Terrain::Empty | Terrain::Colony => BACKGROUND_COLOR,
                 Terrain::Obstacle | Terrain::Border => OBSTACLE_COLOR,
                 Terrain::Food => FOOD_COLOR,
                 Terrain::Invalid => unreachable!("should never try to draw an invalid cell"),
@@ -227,7 +242,8 @@ impl Renderer {
     }
 
     pub fn draw_colony(&mut self, colony: &mut AntColony, d: &mut impl RaylibDraw) {
-        let color = COLONY_COLOR;
+        let mut color = COLONY_COLOR;
+        color.a = 150;
         let pos = self.viewport.grid_to_world(colony.position);
         let rad = colony.radius * self.viewport.cell_size.x;
         d.draw_circle_v(pos, rad, color);
@@ -242,6 +258,8 @@ impl Renderer {
             }
         }
 
-        self.draw_colony(&mut world.colony, d);
+        if self.show_colony {
+            self.draw_colony(&mut world.colony, d);
+        }
     }
 }

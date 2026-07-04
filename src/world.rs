@@ -47,9 +47,10 @@ impl World {
                 // Deliver food to colony
                 if ant.is_returning_food() && current_cell.is_colony() {
                     // If ant is at colony center
-                    if self.grid.world_to_cell(ant.position)
-                        == self.grid.world_to_cell(colony_center)
-                    {
+                    let ant_cell = self.grid.world_to_cell(ant.position);
+                    let col_center_cell = self.grid.world_to_cell(colony_center);
+                    println!("ant_cell= {ant_cell:?} | col_center_cell= {col_center_cell:?}");
+                    if ant_cell == col_center_cell {
                         self.colony.harvested_food += ant.deliver_food();
                         ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                         ant.turn_in_any_direction();
@@ -78,6 +79,19 @@ impl World {
                 {
                     ant.turn_around();
                 } else {
+                    // 1. Calculate how many centimeters the ant physically traveled this frame
+                    let distance_traveled_cm = ant.position.distance(ant.last_position);
+
+                    // 2. Prevent division-by-zero errors if the simulation pauses or lags heavily
+                    if delta_time > 0.0 {
+                        // Distance (cm) divided by Time (seconds) gives you pure, true cm/s!
+                        ant.real_speed_cm_s = distance_traveled_cm / delta_time;
+                    } else {
+                        ant.real_speed_cm_s = 0.0;
+                    }
+
+                    // 3. Save the current position so it can be evaluated on the next frame loop
+                    ant.last_position = ant.position;
                     ant.position = next_position;
                 }
             }

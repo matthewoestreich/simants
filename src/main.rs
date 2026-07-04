@@ -160,6 +160,8 @@ fn handle_key_press(
         renderer.toggle_show_grid();
     } else if rl.is_key_pressed(KeyboardKey::KEY_S) {
         renderer.toggle_show_ant_sensors();
+    } else if rl.is_key_pressed(KeyboardKey::KEY_C) {
+        renderer.toggle_show_colony();
     } else if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {
         *is_paused = !*is_paused;
     }

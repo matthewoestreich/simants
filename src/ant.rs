@@ -1,12 +1,11 @@
 use crate::{
     map::{Cell, CellSample, Grid, Terrain},
-    render::Viewport,
     settings::{
         ANT_ACCELERATION_RATE, ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT, ANT_HARVEST_AMOUNT_RANGE,
         ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
-        ANT_OBSTACLE_PANIC_ANGLE_RANGE, ANT_PAUSE_FOR_RANGE_IN_SEC, ANT_PAUSE_PROBABILITY,
-        ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE, ANT_SPEED_WOBBLE_PERCENT, ANT_TURN_ANGLE,
-        EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE,
+        ANT_OBSTACLE_PANIC_ANGLE_MAX, ANT_OBSTACLE_PANIC_ANGLE_MIN, ANT_PAUSE_FOR_RANGE_IN_SEC,
+        ANT_PAUSE_PROBABILITY, ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE, ANT_SPEED_WOBBLE_PERCENT,
+        ANT_TURN_ANGLE, EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE,
     },
 };
 use rand::RngExt as _;
@@ -140,6 +139,10 @@ pub struct Ant {
     /// Amount of time left in pause. 0.0 means we are not paused.
     pub paused: f32,
 
+    pub last_position: Vector2,
+    pub real_speed_cm_s: f32,
+
+    pub wobble_interval: f32,
     pheromone_tank: f32,
     sensors: Sensors,
     rng: rand::rngs::ThreadRng,
@@ -148,7 +151,7 @@ pub struct Ant {
 impl Ant {
     pub fn new(position: Vector2) -> Self {
         let mut rng = rand::rng();
-        let forward_direction = rng.random_range(0.0f32..360.0f32).to_radians();
+        let forward_direction = rng.random_range(0.0f32.to_radians()..360.0f32.to_radians());
 
         Self {
             position,
@@ -174,8 +177,8 @@ impl Ant {
             Vector2::new(1.0, 0.0) // Fallback heading
         };
 
-        let left_dir = center_dir.rotate(-ANT_SENSOR_ANGLE);
-        let right_dir = center_dir.rotate(ANT_SENSOR_ANGLE);
+        let left_dir = center_dir.rotate(-ANT_SENSOR_ANGLE.to_radians());
+        let right_dir = center_dir.rotate(ANT_SENSOR_ANGLE.to_radians());
 
         let sensor_distance = ANT_SENSOR_DISTANCE as f32;
         let left_loc = self.position + (left_dir * sensor_distance);
@@ -208,17 +211,17 @@ impl Ant {
             else if self.is_foraging()
                 && let Some(angle) = self.steer_towards_terrain(Terrain::Food)
             {
-                angle.to_radians()
+                angle
             }
             // If we are returning food and spotted the colony, steer towards it.
             else if self.is_returning_food()
                 && let Some(angle) = self.steer_towards_terrain(Terrain::Colony)
             {
-                angle.to_radians()
+                angle
             }
             // Pheromone based steering, try to sense pheromones to tell us where to go
             else if let Some(angle) = self.steer_towards_pheromone() {
-                angle.to_radians()
+                angle
             }
             // No pheromones found, wander randomly
             else {
@@ -226,12 +229,12 @@ impl Ant {
             }
         };
 
-        self.apply_speed_wobble(ANT_MAX_SPEED, delta_time);
         self.apply_steering(steering_angle, delta_time);
-
+        self.apply_speed_wobble(ANT_MAX_SPEED, delta_time);
         Some(self.position + self.velocity * delta_time)
     }
 
+    /// VALUE ALREADY RETURNED IN RADIANS!!!
     /// Uses ants sensor readings to determine if the provided terrain was even sensed, and if
     /// it was sensed, which sensors sensed it.
     /// For every sensor that sensed provided terrain, we compare their values and return the
@@ -248,23 +251,24 @@ impl Ant {
 
         if left.terrain == t {
             strongest = left.target_pheromone;
-            angle = Some(-ANT_SENSOR_ANGLE);
+            angle = Some(-ANT_SENSOR_ANGLE.to_radians());
         }
         if center.terrain == t && (strongest < 0.0 || center.target_pheromone > strongest) {
             strongest = center.target_pheromone;
-            angle = Some(0.0f32);
+            angle = Some(0.0f32.to_radians());
         }
         if right.terrain == t {
             #[allow(unused_assignments)]
             if strongest < 0.0 || right.target_pheromone > strongest {
                 strongest = right.target_pheromone;
-                angle = Some(ANT_SENSOR_ANGLE);
+                angle = Some(ANT_SENSOR_ANGLE.to_radians());
             }
         }
 
         angle
     }
 
+    /// VALUE ALREADY RETURNED IN RDIANS!!!!
     /// Steers towards strongest target pheromone. If the strongest value is still 0.0,
     /// it means we did not sense the target pheromone, so we return None
     fn steer_towards_pheromone(&self) -> Option<f32> {
@@ -274,21 +278,21 @@ impl Ant {
 
         // Prefer center (the '>=' comparison)
         if center > 0.0 && center >= left && center >= right {
-            return Some(0.0f32);
+            return Some(0.0f32.to_radians());
         }
         if left > right {
-            return Some(-ANT_SENSOR_ANGLE);
+            return Some(-ANT_SENSOR_ANGLE.to_radians());
         }
         if right > left {
-            return Some(ANT_SENSOR_ANGLE);
+            return Some(ANT_SENSOR_ANGLE.to_radians());
         }
         // If left and right are equal, and at least one of them is > 0.0 (implicitly making both
         // of them > 0.0), randomly pick one.
         if left > 0.0 && left == right {
             if rand::random() {
-                return Some(-ANT_SENSOR_ANGLE);
+                return Some(-ANT_SENSOR_ANGLE.to_radians());
             }
-            return Some(ANT_SENSOR_ANGLE);
+            return Some(ANT_SENSOR_ANGLE.to_radians());
         }
 
         None // They're all 0s, target pheromone was not sensed
@@ -328,16 +332,28 @@ impl Ant {
     }
 
     pub fn apply_speed_wobble(&mut self, mut target_speed: f32, delta_time: f32) {
-        match self.state {
-            AntState::Foraging => {
-                target_speed += self
-                    .rng
-                    .random_range(-ANT_SPEED_WOBBLE_PERCENT..=ANT_SPEED_WOBBLE_PERCENT)
+        self.wobble_interval -= delta_time;
+        if self.wobble_interval <= 0.0 {
+            match self.state {
+                AntState::Foraging => {
+                    let p = (ANT_SPEED_WOBBLE_PERCENT / 100.0) * ANT_MAX_SPEED;
+                    let rand_amnt = self.rng.random_range(-p..=p);
+                    let speed_with_wobble = target_speed + rand_amnt;
+                    //println!(
+                    //    "wobble percent is {p} | rand_wobble= {rand_amnt} | final_new_speed= {speed_with_wobble}"
+                    //);
+                    target_speed += rand_amnt; // self.rng.random_range(-p..=p)
+                }
+                AntState::ReturningFood => target_speed *= ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT,
             }
-            AntState::ReturningFood => target_speed *= ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT,
-        }
 
-        self.speed = self.speed + (target_speed - self.speed) * ANT_ACCELERATION_RATE * delta_time;
+            self.speed =
+                self.speed + (target_speed - self.speed) * ANT_ACCELERATION_RATE * delta_time;
+            if self.speed < 0.0 {
+                println!("ant {} is below zero speed", self.id);
+            }
+            self.wobble_interval = self.rng.random_range(0.3f32..0.7f32);
+        }
     }
 
     // Gets a random number from ANT_HARVEST_AMOUNT_RANGE and takes it from
@@ -414,8 +430,7 @@ impl Ant {
 
     fn get_random_wander_angle(&mut self) -> f32 {
         self.rng
-            .random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
-            .to_radians()
+            .random_range(-ANT_TURN_ANGLE.to_radians()..ANT_TURN_ANGLE.to_radians())
     }
 
     pub fn set_pheromone_tank(&mut self, value: f32) {
@@ -471,15 +486,16 @@ impl Ant {
 
     pub fn turn_around(&mut self) {
         self.velocity *= -1.0;
-        let panic_angle = self
-            .rng
-            .random_range(ANT_OBSTACLE_PANIC_ANGLE_RANGE)
-            .to_radians();
+        let panic_angle = self.rng.random_range(
+            ANT_OBSTACLE_PANIC_ANGLE_MIN.to_radians()..ANT_OBSTACLE_PANIC_ANGLE_MAX.to_radians(),
+        );
         self.velocity = self.velocity.rotate(panic_angle);
     }
 
     pub fn turn_in_any_direction(&mut self) {
-        let angle = self.rng.random_range(-360.0f32..360.0f32).to_radians();
+        let angle = self
+            .rng
+            .random_range(-360.0f32.to_radians()..360.0f32.to_radians());
         self.velocity = self.velocity.rotate(angle);
     }
 
@@ -514,7 +530,11 @@ impl std::fmt::Display for Ant {
             "  velocity: {{ x: {}, y: {} }}",
             self.velocity.x, self.velocity.y
         )?;
-        writeln!(f, "  speed: {}", self.speed)?;
+        writeln!(
+            f,
+            "  speed: {{ units: {}, cm/s: {} }}",
+            self.speed, self.real_speed_cm_s
+        )?;
         writeln!(f, "  pheromone_tank: {}", self.pheromone_tank)?;
         writeln!(
             f,
@@ -528,6 +548,8 @@ impl std::fmt::Display for Ant {
             "  steering_force: {{ x: {}, y: {} }}",
             self.steering_force.x, self.steering_force.y
         )?;
+
+        writeln!(f, "  intervals: {{ wobble: {} }}", self.wobble_interval)?;
 
         writeln!(f, "  sensors: [")?;
         writeln!(f, "    {{ left: {:?} }}", self.sensors.left)?;
