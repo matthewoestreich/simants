@@ -6,7 +6,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 12_000;
+pub const NUM_ANTS: usize = 100;
 pub const PERCENT_OF_EXPLORER_ANTS: f32 = 0.0;
 // When an explorer ants time to explore runs out, it goes exploring.
 // We pick a random number in this range so not all ants go exploring at the same time.
@@ -16,11 +16,11 @@ pub const ANT_WIDTH: f32 = 0.4; // in cm. 0.4 = 0.4cm
 // Pixels per second
 pub const ANT_MAX_SPEED: f32 = 2.5; // (2.5 seems stable) cm/s with bursts that go higher
 pub const ANT_SPEED_WOBBLE_PERCENT: f32 = 50.0; // Should be btwn 0.1 and 100.0
-pub const ANT_ACCELERATION_RATE: f32 = 100.0; // 5.0 seems stable
+pub const ANT_ACCELERATION_RATE: f32 = 5.0; // 5.0 seems stable
 pub const ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT: f32 = 0.70; // If this value is 0.70, it will slow the ant down 30%
 pub const ANT_MAX_PHEROMONE_CAPACITY: f32 = 200.0;
 pub const ANT_HARVEST_AMOUNT_RANGE: Range<f32> = 10.0..50.0;
-pub const ANT_MAX_TURN_FORCE: f32 = 15.0;
+pub const ANT_MAX_TURN_FORCE: f32 = 5.0;
 pub const ANT_TURN_ANGLE: f32 = 30.0;
 // When an ant is at an obstacle, we furst flip the current direction it is facingg, so we need to
 // turn using some degree of random variance as to prevent us from bouncing back and forth in corners.

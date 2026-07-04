@@ -7,6 +7,8 @@ mod render;
 mod settings;
 mod world;
 
+use std::collections::HashSet;
+
 use crate::{
     ant::AntColony,
     map::Grid,
@@ -87,8 +89,7 @@ fn main() {
                 // Fast-forward splits the work into stable, tiny slices!
                 // Example: at 10x speed, we loop 10 times, passing a safe 1x delta_time each loop
                 let steps = fast_forward_multiplier.floor() as i32;
-                let step_dt = dt; // Pass a normal frame time slice to keep math stable
-
+                let step_dt = 0.01666667;
                 for _ in 0..steps {
                     world.update(step_dt);
                 }
