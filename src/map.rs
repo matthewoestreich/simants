@@ -63,19 +63,21 @@ impl Grid {
         let food_center_y = 100; //rows / 2; // 200 / 2 = 100
         let food_radius = FOOD_RADIUS;
 
-        for cell in self.cells.iter_mut() {
-            let x = cell.x;
-            let y = cell.y;
+        for cell in &mut self.cells {
+            let cell_x = cell.x;
+            let cell_y = cell.y;
+
+            cell.terrain = Terrain::Empty;
 
             // Mark border cells
-            if x == 0 || x == cols - 1 || y == 0 || y == rows - 1 {
+            if (cell_x == 0 || cell_x == cols - 1) || (cell_y == 0 || cell_y == rows - 1) {
                 cell.terrain = Terrain::Border;
                 continue;
             }
 
             // Marks a cell as an obstacle.
             // This obstacle will eventually be drawn as a vertical line that is centerted horizontally and vertically
-            if x_range.contains(&x) && y_range.contains(&y) {
+            if x_range.contains(&cell_x) && y_range.contains(&cell_y) {
                 //if y % 20 <= 3 {
                 //    continue;
                 //}
@@ -84,8 +86,8 @@ impl Grid {
             }
 
             // Marks a cell as food.
-            let food_dx = x as i32 - food_center_x;
-            let food_dy = y as i32 - food_center_y;
+            let food_dx = cell_x as i32 - food_center_x;
+            let food_dy = cell_y as i32 - food_center_y;
             if food_dx * food_dx + food_dy * food_dy <= food_radius as i32 * food_radius as i32 {
                 cell.terrain = Terrain::Food;
                 cell.food = FOOD_CELL_MAX_AMOUNT;
@@ -93,11 +95,7 @@ impl Grid {
             }
 
             // Mark the underlying cells of the colony as such
-            //let cell_center = Vector2::new(
-            //    (x as f32 * cell_size_f32) + (cell_size_f32 / 2.0),
-            //    (y as f32 * cell_size_f32) + (cell_size_f32 / 2.0),
-            //);
-            let cell_center = Vector2::new(x as f32 + 0.5, y as f32 + 0.5);
+            let cell_center = Vector2::new(cell_x as f32 + 0.5, cell_y as f32 + 0.5);
             // If distance from cell center to colony center is less than or
             // equal to the colony area, it means we are in the colony.
             if cell_center.distance_sqr(colony.position) <= colony.area {
@@ -119,6 +117,14 @@ impl Grid {
             return None;
         }
         Some(&self.cells[self.index(x, y)])
+    }
+
+    pub fn get_cell_mut(&mut self, x: u32, y: u32) -> Option<&mut Cell> {
+        if !self.is_within_grid_bounds(x, y) {
+            return None;
+        }
+        let i = self.index(x, y);
+        Some(&mut self.cells[i])
     }
 
     pub fn cell_center(&self, x: u32, y: u32) -> Vector2 {

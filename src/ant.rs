@@ -1,5 +1,6 @@
 use crate::{
     map::{Cell, CellSample, Grid, Terrain},
+    render::WorldPanel,
     settings::{
         ANT_ACCELERATION_RATE, ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT, ANT_HARVEST_AMOUNT_RANGE,
         ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
@@ -17,7 +18,6 @@ use raylib::ffi::Vector2;
 
 #[derive(Default, Debug, Clone)]
 pub struct AntColony {
-    pub num_ants: usize,
     pub ants: Vec<Ant>,
     pub radius: f32,
     pub area: f32,
@@ -28,7 +28,6 @@ pub struct AntColony {
 impl AntColony {
     pub fn new(num_ants: usize, radius: f32, position: Vector2) -> Self {
         Self {
-            num_ants,
             radius,
             area: radius * radius,
             ants: Vec::with_capacity(num_ants),
@@ -49,10 +48,18 @@ impl AntColony {
     }
 
     pub fn spawn_ants(&mut self, percent_of_explorer_ants: f32) {
-        // Calculate number of ants that need to be explorers
-        let mut pcnt = ((percent_of_explorer_ants / 100.0) * self.num_ants as f32).ceil();
+        let len = if !self.ants.is_empty() {
+            self.ants.len()
+        } else if self.ants.capacity() > 0 {
+            self.ants.capacity()
+        } else {
+            0
+        };
 
-        for i in 0..self.num_ants {
+        // Calculate number of ants that need to be explorers
+        let mut pcnt = ((percent_of_explorer_ants / 100.0) * len as f32).ceil();
+
+        for i in 0..len {
             let mut ant = Ant::new(self.position);
 
             ant.id = i as i32;
@@ -159,7 +166,7 @@ impl Ant {
     }
 
     /// Updates current sensor samples and returns current cell
-    pub fn sense_environment(&mut self, grid: &Grid) {
+    pub fn sense_environment<'a>(&mut self, grid: &'a mut Grid) -> &'a mut Cell {
         // Rotate forward heading vector to find antenna paths
         let center_dir = if self.velocity.length_sqr() > 0.0 {
             self.velocity.normalize()
@@ -170,8 +177,7 @@ impl Ant {
         let left_dir = center_dir.rotate(-ANT_SENSOR_ANGLE);
         let right_dir = center_dir.rotate(ANT_SENSOR_ANGLE);
 
-        let sensor_distance = (ANT_SENSOR_DISTANCE) as f32;
-
+        let sensor_distance = ANT_SENSOR_DISTANCE as f32;
         let left_loc = self.position + (left_dir * sensor_distance);
         let center_loc = self.position + (center_dir * sensor_distance);
         let right_loc = self.position + (right_dir * sensor_distance);
@@ -189,8 +195,8 @@ impl Ant {
             reading: grid.sample_position_with_pheromone_bias(right_loc, self.state),
         };
 
-        //grid.get_cell_mut_from_position(self.position)
-        //    .expect("current position to always be valid")
+        grid.get_cell_mut(self.position.x as u32, self.position.y as u32)
+            .expect("current position to always be valid")
     }
 
     pub fn calculate_next_position(&mut self, delta_time: f32) -> Option<Vector2> {
@@ -487,20 +493,14 @@ impl Ant {
 // For UI stuff
 
 impl Ant {
-    pub fn is_clicked(
-        &self,
-        mouse_screen_pos: Vector2,
-        click_radius: f32,
-        offset_x: i32,
-        offset_y: i32,
-    ) -> bool {
-        let screen_ant_pos = Vector2::new(
-            offset_x as f32 + self.position.x,
-            offset_y as f32 + self.position.y,
-        );
-        let distance_squared = mouse_screen_pos.distance_sqr(screen_ant_pos);
+    pub fn is_clicked(&self, mouse_screen_pos: Vector2, click_radius: f32) -> bool {
+        let distance_squared = mouse_screen_pos.distance_sqr(self.position);
         let click_radius_squared = click_radius * click_radius;
-        distance_squared <= click_radius_squared
+        let res = distance_squared <= click_radius_squared;
+
+        println!("ant.position= {:?}", self.position);
+
+        res
     }
 }
 

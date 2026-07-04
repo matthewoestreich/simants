@@ -14,7 +14,6 @@ impl World {
         Self { grid, colony }
     }
 
-    /*
     pub fn update(&mut self, delta_time: f32) {
         for cell in self.grid.iter_mut() {
             match cell.terrain {
@@ -47,7 +46,10 @@ impl World {
                 }
                 // Deliver food to colony
                 if ant.is_returning_food() && current_cell.is_colony() {
-                    if World::is_same_position(colony_center, ant.position, self.grid.cell_size) {
+                    // If ant is at colony center
+                    if self.grid.world_to_cell(ant.position)
+                        == self.grid.world_to_cell(colony_center)
+                    {
                         self.colony.harvested_food += ant.deliver_food();
                         ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                         ant.turn_in_any_direction();
@@ -70,7 +72,10 @@ impl World {
 
             // Handle movement
             if let Some(next_position) = ant.calculate_next_position(delta_time) {
-                if self.grid.position_is_obstruction(next_position) {
+                let cell_pos = self.grid.world_to_cell(next_position);
+                if let Some(c) = self.grid.get_cell(cell_pos.0, cell_pos.1)
+                    && c.is_obstruction()
+                {
                     ant.turn_around();
                 } else {
                     ant.position = next_position;
@@ -78,7 +83,6 @@ impl World {
             }
         }
     }
-    */
 
     pub fn calculate_decayed_amount(strength: f32, delta_time: f32, decay_rate: f32) -> f32 {
         if strength <= 0.0 {

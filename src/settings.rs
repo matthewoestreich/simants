@@ -6,7 +6,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 17_000;
+pub const NUM_ANTS: usize = 1;
 pub const PERCENT_OF_EXPLORER_ANTS: f32 = 0.5;
 // When an explorer ants time to explore runs out, it goes exploring.
 // We pick a random number in this range so not all ants go exploring at the same time.
@@ -74,8 +74,8 @@ pub const WINDOW_HEIGHT: i32 = 800;
 pub const WORLD_WIDTH: i32 = 800;
 pub const WORLD_HEIGHT: i32 = 600;
 
-pub const GRID_COLS: u32 = 300;
-pub const GRID_ROWS: u32 = 200;
+pub const GRID_COLS: u32 = 300; //300;
+pub const GRID_ROWS: u32 = 200; //200;
 
 /* ----------------------------------- */
 /* ------- Color Options ------------- */

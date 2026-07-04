@@ -3,15 +3,17 @@ use crate::{
     map::{Grid, Terrain},
     settings::{
         ANT_FORAGING_COLOR, ANT_RETURNING_FOOD_COLOR, BACKGROUND_COLOR, COLONY_COLOR, FOOD_COLOR,
-        FOOD_RADIUS, OBSTACLE_COLOR,
+        FOOD_RADIUS, MAX_RGBA_VALUE, OBSTACLE_COLOR, PHEROMONE_FORAGING_COLOR,
+        PHEROMONE_RETURNING_FOOD_COLOR,
     },
     world::World,
 };
 use raylib::{
-    ffi::{Color, Rectangle, Vector2},
-    prelude::{RaylibDraw as _, RaylibDrawHandle, RaylibMode2D},
+    ffi::{Camera2D, Color, Rectangle, Vector2},
+    prelude::{RaylibDraw, RaylibDrawHandle, RaylibMode2D},
 };
 
+#[derive(Debug)]
 pub struct WorldPanel {
     pub x: i32,
     pub y: i32,
@@ -31,10 +33,21 @@ impl WorldPanel {
         }
     }
 
+    pub fn grid_to_world(&self, grid_pos: Vector2) -> Vector2 {
+        Vector2::new(grid_pos.x * self.cell_size.x, grid_pos.y * self.cell_size.y)
+    }
+
     pub fn world_to_screen(&self, world: Vector2) -> Vector2 {
         Vector2::new(
             self.x as f32 + world.x * self.cell_size.x,
             self.y as f32 + world.y * self.cell_size.y,
+        )
+    }
+
+    pub fn screen_to_world(&self, screen: Vector2) -> Vector2 {
+        Vector2::new(
+            (screen.x - self.x as f32) / self.cell_size.x,
+            (screen.y - self.y as f32) / self.cell_size.y,
         )
     }
 }
@@ -44,6 +57,8 @@ pub struct Renderer {
     show_grid: bool,
     show_ants: bool,
     show_pheromones: bool,
+    show_to_home_pheromones: bool,
+    show_to_food_pheromones: bool,
     show_ant_sensors: bool,
     show_border: bool,
 }
@@ -52,12 +67,18 @@ impl Renderer {
     pub fn new(world_panel: WorldPanel) -> Self {
         Self {
             world_panel,
-            show_grid: false,
+            show_grid: true,
             show_ants: true,
-            show_ant_sensors: false,
+            show_ant_sensors: true,
             show_border: true,
             show_pheromones: true,
+            show_to_home_pheromones: true,
+            show_to_food_pheromones: true,
         }
+    }
+
+    pub fn get_world_panel(&self) -> &WorldPanel {
+        &self.world_panel
     }
 
     pub fn toggle_show_border(&mut self) {
@@ -65,21 +86,21 @@ impl Renderer {
     }
 
     // 'show' should be "ALL", "FOOD", or "HOME"
-    //pub fn toggle_show_pheromones(&mut self, show: &str) {
-    //    match show {
-    //        "ALL" => {
-    //            self.show_to_home_pheromones = !self.show_to_home_pheromones;
-    //            self.show_to_food_pheromones = !self.show_to_food_pheromones;
-    //        }
-    //        "FOOD" => {
-    //            self.show_to_food_pheromones = !self.show_to_food_pheromones;
-    //        }
-    //        "HOME" => {
-    //            self.show_to_home_pheromones = !self.show_to_home_pheromones;
-    //        }
-    //        _ => {}
-    //    }
-    //}
+    pub fn toggle_show_pheromones(&mut self, show: &str) {
+        match show {
+            "ALL" => {
+                self.show_to_home_pheromones = !self.show_to_home_pheromones;
+                self.show_to_food_pheromones = !self.show_to_food_pheromones;
+            }
+            "FOOD" => {
+                self.show_to_food_pheromones = !self.show_to_food_pheromones;
+            }
+            "HOME" => {
+                self.show_to_home_pheromones = !self.show_to_home_pheromones;
+            }
+            _ => {}
+        }
+    }
 
     pub fn toggle_show_grid(&mut self) {
         self.show_grid = !self.show_grid;
@@ -93,12 +114,7 @@ impl Renderer {
         self.show_ants = !self.show_ants;
     }
 
-    pub fn draw_ant(
-        &mut self,
-        ant: &Ant,
-        d: &mut RaylibMode2D<RaylibDrawHandle>,
-        draw_sensors: bool,
-    ) {
+    pub fn draw_ant(&mut self, ant: &Ant, d: &mut impl RaylibDraw, draw_sensors: bool) {
         let (ant_color, mut sensor_color) = match ant.state {
             AntState::Foraging => (ANT_FORAGING_COLOR, FOOD_COLOR),
             AntState::ReturningFood => (ANT_RETURNING_FOOD_COLOR, COLONY_COLOR),
@@ -116,9 +132,9 @@ impl Renderer {
         let left_back_pos = pos - forward * (length * 0.5) - right * (width * 0.5);
         let right_back_pos = pos - forward * (length * 0.5) + right * (width * 0.5);
 
-        let spear = self.world_panel.world_to_screen(spear_pos);
-        let left_back = self.world_panel.world_to_screen(left_back_pos);
-        let right_back = self.world_panel.world_to_screen(right_back_pos);
+        let spear = self.world_panel.grid_to_world(spear_pos);
+        let left_back = self.world_panel.grid_to_world(left_back_pos);
+        let right_back = self.world_panel.grid_to_world(right_back_pos);
 
         d.draw_triangle(spear, left_back, right_back, ant_color);
 
@@ -126,89 +142,109 @@ impl Renderer {
             d.draw_triangle_lines(spear, left_back, right_back, Color::YELLOW);
         }
 
-        /*
-        if draw_sensors {
+        if self.show_ant_sensors {
             sensor_color.a = 150; // semi-transparent
             let size = Vector2::new(2.0, 2.0);
 
             let sensors = ant.get_sensors();
 
             if let Some(l) = sensors.left.location {
-                let pos = Vector2::new(ox + l.x, oy + l.y);
+                let pos = self.world_panel.grid_to_world(Vector2::new(l.x, l.y));
                 d.draw_line_v(pos, pos, sensor_color);
                 d.draw_rectangle_v(pos, size, sensor_color);
             }
             if let Some(c) = sensors.center.location {
-                let pos = Vector2::new(ox + c.x, oy + c.y);
+                let pos = self.world_panel.grid_to_world(Vector2::new(c.x, c.y));
                 d.draw_line_v(pos, pos, sensor_color);
                 d.draw_rectangle_v(pos, size, sensor_color);
             }
             if let Some(r) = sensors.right.location {
-                let pos = Vector2::new(ox + r.x, oy + r.y);
+                let pos = self.world_panel.grid_to_world(Vector2::new(r.x, r.y));
                 d.draw_line_v(pos, pos, sensor_color);
                 d.draw_rectangle_v(pos, size, sensor_color);
             }
         }
-        */
     }
 
-    pub fn draw_grid(&mut self, grid: &mut Grid, d: &mut RaylibMode2D<RaylibDrawHandle>) {
+    pub fn draw_grid(&mut self, grid: &mut Grid, d: &mut impl RaylibDraw) {
         for cell in grid.iter_mut() {
-            let world_pos = Vector2::new(cell.x as f32, cell.y as f32);
-            let screen = self.world_panel.world_to_screen(world_pos);
+            let draw = self
+                .world_panel
+                .grid_to_world(Vector2::new(cell.x as f32, cell.y as f32));
 
             let color = match cell.terrain {
-                Terrain::Empty | Terrain::Colony => BACKGROUND_COLOR,
+                Terrain::Empty => BACKGROUND_COLOR,
+                Terrain::Colony => Color::ORANGE,
                 Terrain::Obstacle | Terrain::Border => OBSTACLE_COLOR,
                 Terrain::Food => FOOD_COLOR,
                 Terrain::Invalid => unreachable!("should never try to draw an invalid cell"),
             };
-
-            if self.show_grid {
-                let thickness = 0.5;
-                let line_color = Color::new(80, 80, 80, 255);
-                let rect = Rectangle::new(
-                    screen.x,
-                    screen.y,
-                    self.world_panel.cell_size.x,
-                    self.world_panel.cell_size.y,
-                );
-                d.draw_rectangle_lines_ex(rect, thickness, line_color);
-            }
 
             if cell.is_border() && !self.show_border {
                 continue;
             }
 
             d.draw_rectangle(
-                screen.x as i32,
-                screen.y as i32,
+                draw.x as i32,
+                draw.y as i32,
                 self.world_panel.cell_size.x as i32 + 1,
                 self.world_panel.cell_size.y as i32 + 1,
                 color,
             );
-        }
 
-        //let color = FOOD_COLOR;
-        //let pos = self.world_panel.world_to_screen(Vector2::new(225.0, 100.0));
-        //let rad = FOOD_RADIUS * self.world_panel.cell_size.x;
-        //d.draw_circle_v(pos, rad, color);
+            if self.show_grid {
+                let thickness = 0.1;
+                let line_color = Color::new(80, 80, 80, 255);
+                let rect = Rectangle::new(
+                    draw.x,
+                    draw.y,
+                    self.world_panel.cell_size.x,
+                    self.world_panel.cell_size.y,
+                );
+                d.draw_rectangle_lines_ex(rect, thickness, line_color);
+            }
+
+            if self.show_to_home_pheromones && cell.to_home > 0.0 {
+                let brightness = ((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 0.8;
+                let color = PHEROMONE_FORAGING_COLOR.brightness(brightness);
+                d.draw_rectangle(
+                    draw.x as i32,
+                    draw.y as i32,
+                    self.world_panel.cell_size.x as i32,
+                    self.world_panel.cell_size.y as i32,
+                    color,
+                );
+            }
+            if self.show_to_food_pheromones && cell.to_food > 0.0 {
+                let brightness = ((cell.to_food / MAX_RGBA_VALUE) * 2.0) - 0.8;
+                let color = PHEROMONE_RETURNING_FOOD_COLOR.brightness(brightness);
+                d.draw_rectangle(
+                    draw.x as i32,
+                    draw.y as i32,
+                    self.world_panel.cell_size.x as i32,
+                    self.world_panel.cell_size.y as i32,
+                    color,
+                );
+            }
+        }
     }
 
-    pub fn draw_colony(&mut self, colony: &mut AntColony, d: &mut RaylibMode2D<RaylibDrawHandle>) {
+    pub fn draw_colony(&mut self, colony: &mut AntColony, d: &mut impl RaylibDraw) {
         let color = COLONY_COLOR;
-        let pos = self.world_panel.world_to_screen(colony.position);
+        let pos = self.world_panel.grid_to_world(colony.position);
         let rad = colony.radius * self.world_panel.cell_size.x;
         d.draw_circle_v(pos, rad, color);
     }
 
-    pub fn draw_world(&mut self, world: &mut World, d: &mut RaylibMode2D<RaylibDrawHandle>) {
+    pub fn draw_world(&mut self, world: &mut World, d: &mut impl RaylibDraw) {
         self.draw_grid(&mut world.grid, d);
+
         if self.show_ants {
             for ant in &world.colony.ants {
                 self.draw_ant(ant, d, false);
             }
         }
+
         self.draw_colony(&mut world.colony, d);
     }
 }
