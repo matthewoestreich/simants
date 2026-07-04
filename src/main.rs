@@ -10,7 +10,7 @@ mod world;
 use crate::{
     ant::AntColony,
     map::Grid,
-    render::{Renderer, WorldPanel},
+    render::{Renderer, Viewport},
     settings::{
         BACKGROUND_COLOR, COLONY_RADIUS, GRID_COLS, GRID_ROWS, NUM_ANTS, PERCENT_OF_EXPLORER_ANTS,
         TITLE, WINDOW_HEIGHT, WINDOW_WIDTH, WORLD_HEIGHT, WORLD_WIDTH,
@@ -29,13 +29,16 @@ fn main() {
         .size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .build();
 
-    let wp_x = (WINDOW_WIDTH - WORLD_WIDTH) / 2;
-    let wp_y = (WINDOW_HEIGHT - WORLD_HEIGHT) / 2;
-    let world_panel = WorldPanel::new(wp_x, wp_y, WORLD_WIDTH, WORLD_HEIGHT, GRID_COLS, GRID_ROWS);
+    let viewport = Viewport::new(
+        (WINDOW_WIDTH - WORLD_WIDTH) / 2,
+        (WINDOW_HEIGHT - WORLD_HEIGHT) / 2,
+        WORLD_WIDTH,
+        WORLD_HEIGHT,
+        GRID_COLS,
+        GRID_ROWS,
+    );
 
-    let cell_size = world_panel.cell_size;
-
-    let mut renderer = Renderer::new(world_panel);
+    let mut renderer = Renderer::new(viewport);
 
     let colony = AntColony::new_with_immediate_spawn(
         NUM_ANTS,
@@ -54,12 +57,12 @@ fn main() {
 
     let mut camera = Camera2D {
         target: Vector2::new(
-            (GRID_COLS as f32 * cell_size.x) / 2.0,
-            (GRID_ROWS as f32 * cell_size.y) / 2.0,
+            (GRID_COLS as f32 * renderer.viewport.cell_size.x) / 2.0,
+            (GRID_ROWS as f32 * renderer.viewport.cell_size.y) / 2.0,
         ),
         offset: Vector2::new(
-            wp_x as f32 + (WORLD_WIDTH as f32 / 2.0),
-            wp_y as f32 + (WORLD_HEIGHT as f32 / 2.0),
+            renderer.viewport.x as f32 + (WORLD_WIDTH as f32 / 2.0),
+            renderer.viewport.y as f32 + (WORLD_HEIGHT as f32 / 2.0),
         ),
         rotation: 0.0,
         zoom: 1.0,
@@ -80,12 +83,7 @@ fn main() {
             world.update(rl.get_frame_time());
         }
 
-        let mouse_pos = rl.get_mouse_position();
-        if mouse_pos.x >= wp_x as f32
-            && mouse_pos.x <= (wp_x + WORLD_WIDTH) as f32
-            && mouse_pos.y >= wp_y as f32
-            && mouse_pos.y <= (wp_y + WORLD_HEIGHT) as f32
-        {
+        if renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
             handle_key_press(
                 &mut rl,
                 &mut renderer,
@@ -97,7 +95,7 @@ fn main() {
                 &mut rl,
                 &mut camera,
                 &mut world,
-                renderer.get_world_panel(),
+                &renderer.viewport,
                 &mut is_dragging,
                 &mut click_start_pos,
             );
@@ -107,13 +105,24 @@ fn main() {
         d.clear_background(BACKGROUND_COLOR);
 
         {
-            let mut scissor = d.begin_scissor_mode(wp_x, wp_y, WORLD_WIDTH, WORLD_HEIGHT);
+            let mut scissor = d.begin_scissor_mode(
+                renderer.viewport.x,
+                renderer.viewport.y,
+                renderer.viewport.width,
+                renderer.viewport.height,
+            );
             let mut mode2d = scissor.begin_mode2D(camera);
             renderer.draw_world(&mut world, &mut mode2d);
         }
 
-        let wp = renderer.get_world_panel();
-        d.draw_rectangle_lines(wp.x, wp.y, wp.width, wp.height, Color::RED);
+        // Bordr around viewport
+        d.draw_rectangle_lines(
+            renderer.viewport.x,
+            renderer.viewport.y,
+            renderer.viewport.width,
+            renderer.viewport.height,
+            Color::RED,
+        );
 
         if is_pheromone_mode {
             d.draw_text("PHEROMONE MODE ON", 10, 10, 20, Color::WHITE);
@@ -177,7 +186,7 @@ fn handle_mouse_wheel(rl: &mut RaylibHandle, camera: &mut Camera2D, renderer: &m
             camera.target.x += world_mouse_before.x - world_mouse_after.x;
             camera.target.y += world_mouse_before.y - world_mouse_after.y;
         } else {
-            let wp = renderer.get_world_panel();
+            let wp = &renderer.viewport;
             // Restore clean home alignment
             camera.zoom = 1.0;
             camera.target = Vector2::new(
@@ -196,7 +205,7 @@ fn handle_mouse_click(
     rl: &mut RaylibHandle,
     camera: &mut Camera2D,
     world: &mut World,
-    world_panel: &WorldPanel,
+    world_panel: &Viewport,
     is_dragging: &mut bool,
     click_start_pos: &mut Vector2,
 ) {

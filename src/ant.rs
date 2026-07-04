@@ -1,6 +1,6 @@
 use crate::{
     map::{Cell, CellSample, Grid, Terrain},
-    render::WorldPanel,
+    render::Viewport,
     settings::{
         ANT_ACCELERATION_RATE, ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT, ANT_HARVEST_AMOUNT_RANGE,
         ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
@@ -496,11 +496,7 @@ impl Ant {
     pub fn is_clicked(&self, mouse_screen_pos: Vector2, click_radius: f32) -> bool {
         let distance_squared = mouse_screen_pos.distance_sqr(self.position);
         let click_radius_squared = click_radius * click_radius;
-        let res = distance_squared <= click_radius_squared;
-
-        println!("ant.position= {:?}", self.position);
-
-        res
+        distance_squared <= click_radius_squared
     }
 }
 
