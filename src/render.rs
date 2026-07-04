@@ -3,9 +3,9 @@ use crate::{
     map::{Grid, Terrain},
     settings::{
         ANT_FORAGING_COLOR, ANT_LENGTH, ANT_RETURNING_FOOD_COLOR, ANT_WIDTH, BACKGROUND_COLOR,
-        COLONY_COLOR, FOOD_COLOR, MAX_RGBA_VALUE, OBSTACLE_COLOR, PHEROMONE_FORAGING_COLOR,
-        PHEROMONE_RETURNING_FOOD_COLOR, SHOW_ANT_SENSORS, SHOW_ANTS, SHOW_BORDER, SHOW_GRID_LINES,
-        SHOW_PHEROMONES,
+        COLONY_COLOR, FOOD_COLOR, GRID_COLS, GRID_ROWS, MAX_RGBA_VALUE, OBSTACLE_COLOR,
+        PHEROMONE_FORAGING_COLOR, PHEROMONE_RETURNING_FOOD_COLOR, SHOW_ANT_SENSORS, SHOW_ANTS,
+        SHOW_BORDER, SHOW_GRID_LINES, SHOW_PHEROMONES,
     },
     world::World,
 };
@@ -45,6 +45,7 @@ impl Viewport {
             && pos.y <= (self.y + self.height) as f32
     }
 
+    /*
     pub fn world_to_screen(&self, world: Vector2) -> Vector2 {
         Vector2::new(
             self.x as f32 + world.x * self.cell_size.x,
@@ -58,6 +59,7 @@ impl Viewport {
             (screen.y - self.y as f32) / self.cell_size.y,
         )
     }
+    */
 }
 
 #[derive(Default, Debug)]
@@ -70,6 +72,7 @@ pub struct Renderer {
     show_ant_sensors: bool,
     show_border: bool,
     show_colony: bool,
+    show_food: bool,
 }
 
 impl Renderer {
@@ -83,6 +86,7 @@ impl Renderer {
             show_ant_sensors: SHOW_ANT_SENSORS,
             show_to_home_pheromones: SHOW_PHEROMONES,
             show_to_food_pheromones: SHOW_PHEROMONES,
+            show_food: true,
         }
     }
 
@@ -107,6 +111,10 @@ impl Renderer {
         }
     }
 
+    pub fn toggle_show_food(&mut self) {
+        self.show_food = !self.show_food;
+    }
+
     pub fn toggle_show_grid(&mut self) {
         self.show_grid = !self.show_grid;
     }
@@ -123,7 +131,7 @@ impl Renderer {
         self.show_ants = !self.show_ants;
     }
 
-    pub fn draw_ant(&mut self, ant: &Ant, d: &mut impl RaylibDraw, draw_sensors: bool) {
+    pub fn draw_ant(&mut self, ant: &Ant, d: &mut impl RaylibDraw) {
         let (mut ant_color, mut sensor_color) = match ant.state {
             AntState::Foraging => (ANT_FORAGING_COLOR, FOOD_COLOR),
             AntState::ReturningFood => (ANT_RETURNING_FOOD_COLOR, COLONY_COLOR),
@@ -188,11 +196,14 @@ impl Renderer {
             let color = match cell.terrain {
                 Terrain::Empty | Terrain::Colony => BACKGROUND_COLOR,
                 Terrain::Obstacle | Terrain::Border => OBSTACLE_COLOR,
-                Terrain::Food => FOOD_COLOR,
+                Terrain::Food => BACKGROUND_COLOR, // FOOD_COLOR,
                 Terrain::Invalid => unreachable!("should never try to draw an invalid cell"),
             };
 
             if cell.is_border() && !self.show_border {
+                continue;
+            }
+            if cell.is_food() && !self.show_food {
                 continue;
             }
 
@@ -204,25 +215,13 @@ impl Renderer {
                 color,
             );
 
-            if self.show_grid {
-                let thickness = 0.1;
-                let line_color = Color::new(80, 80, 80, 255);
-                let rect = Rectangle::new(
-                    draw.x,
-                    draw.y,
-                    self.viewport.cell_size.x,
-                    self.viewport.cell_size.y,
-                );
-                d.draw_rectangle_lines_ex(rect, thickness, line_color);
-            }
-
             if self.show_to_home_pheromones && cell.to_home > 0.0 {
                 let brightness = ((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 0.8;
                 let color = PHEROMONE_FORAGING_COLOR.brightness(brightness);
                 d.draw_rectangle(
                     draw.x as i32,
                     draw.y as i32,
-                    self.viewport.cell_size.x as i32,
+                    self.viewport.cell_size.x as i32 + 1,
                     self.viewport.cell_size.y as i32,
                     color,
                 );
@@ -237,6 +236,42 @@ impl Renderer {
                     self.viewport.cell_size.y as i32,
                     color,
                 );
+            }
+        }
+
+        if self.show_food {
+            for cell in grid.iter_mut() {
+                if cell.is_food() {
+                    let draw = self
+                        .viewport
+                        .grid_to_world(Vector2::new(cell.x as f32, cell.y as f32));
+                    d.draw_rectangle(
+                        draw.x as i32,
+                        draw.y as i32,
+                        self.viewport.cell_size.x as i32 + 1,
+                        self.viewport.cell_size.y as i32 + 1,
+                        FOOD_COLOR,
+                    );
+                }
+            }
+        }
+
+        if self.show_grid {
+            let thickness = 0.3;
+            let line_color = Color::new(80, 80, 80, 255);
+            let max_world_x = GRID_COLS as f32 * self.viewport.cell_size.x;
+            let max_world_y = GRID_ROWS as f32 * self.viewport.cell_size.y;
+            for col in 0..=GRID_COLS {
+                let x_pos = col as f32 * self.viewport.cell_size.x;
+                let start = Vector2::new(x_pos, 0.0);
+                let end = Vector2::new(x_pos, max_world_y);
+                d.draw_line_ex(start, end, thickness, line_color);
+            }
+            for row in 0..=GRID_ROWS {
+                let y_pos = row as f32 * self.viewport.cell_size.y;
+                let start = Vector2::new(0.0, y_pos);
+                let end = Vector2::new(max_world_x, y_pos);
+                d.draw_line_ex(start, end, thickness, line_color);
             }
         }
     }
@@ -254,7 +289,7 @@ impl Renderer {
 
         if self.show_ants {
             for ant in &world.colony.ants {
-                self.draw_ant(ant, d, false);
+                self.draw_ant(ant, d);
             }
         }
 

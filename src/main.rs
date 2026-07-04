@@ -162,6 +162,8 @@ fn handle_key_press(
         renderer.toggle_show_ant_sensors();
     } else if rl.is_key_pressed(KeyboardKey::KEY_C) {
         renderer.toggle_show_colony();
+    } else if rl.is_key_pressed(KeyboardKey::KEY_F) {
+        renderer.toggle_show_food();
     } else if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {
         *is_paused = !*is_paused;
     }
@@ -180,7 +182,7 @@ fn handle_mouse_wheel(rl: &mut RaylibHandle, camera: &mut Camera2D, renderer: &m
             camera.zoom / scale_factor
         };
 
-        next_zoom = next_zoom.clamp(1.0, 10.0);
+        next_zoom = next_zoom.clamp(1.0, 100.0);
 
         if next_zoom > 1.0 {
             camera.zoom = next_zoom;

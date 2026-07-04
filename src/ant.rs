@@ -142,7 +142,6 @@ pub struct Ant {
     pub last_position: Vector2,
     pub real_speed_cm_s: f32,
 
-    pub wobble_interval: f32,
     pheromone_tank: f32,
     sensors: Sensors,
     rng: rand::rngs::ThreadRng,
@@ -331,28 +330,28 @@ impl Ant {
         }
     }
 
-    pub fn apply_speed_wobble(&mut self, mut target_speed: f32, delta_time: f32) {
-        self.wobble_interval -= delta_time;
-        if self.wobble_interval <= 0.0 {
-            match self.state {
-                AntState::Foraging => {
-                    let p = (ANT_SPEED_WOBBLE_PERCENT / 100.0) * ANT_MAX_SPEED;
-                    let rand_amnt = self.rng.random_range(-p..=p);
-                    let speed_with_wobble = target_speed + rand_amnt;
-                    //println!(
-                    //    "wobble percent is {p} | rand_wobble= {rand_amnt} | final_new_speed= {speed_with_wobble}"
-                    //);
-                    target_speed += rand_amnt; // self.rng.random_range(-p..=p)
-                }
-                AntState::ReturningFood => target_speed *= ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT,
+    pub fn apply_speed_wobble(&mut self, base_speed: f32, delta_time: f32) {
+        match self.state {
+            AntState::Foraging => {
+                let rolled_percent = self
+                    .rng
+                    .random_range(-ANT_SPEED_WOBBLE_PERCENT..=ANT_SPEED_WOBBLE_PERCENT);
+                let max_variance_ratio = rolled_percent / 100.0;
+                let smooth_wobble = max_variance_ratio * ANT_ACCELERATION_RATE * delta_time;
+                self.speed += base_speed * smooth_wobble;
+                let min_allowed = base_speed * (1.0 - (ANT_SPEED_WOBBLE_PERCENT / 100.0));
+                let max_allowed = base_speed * (1.0 + (ANT_SPEED_WOBBLE_PERCENT / 100.0));
+                self.speed = self.speed.clamp(min_allowed, max_allowed);
             }
+            AntState::ReturningFood => {
+                let target_speed = base_speed * ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT;
+                self.speed =
+                    self.speed + (target_speed - self.speed) * ANT_ACCELERATION_RATE * delta_time;
+            }
+        }
 
-            self.speed =
-                self.speed + (target_speed - self.speed) * ANT_ACCELERATION_RATE * delta_time;
-            if self.speed < 0.0 {
-                println!("ant {} is below zero speed", self.id);
-            }
-            self.wobble_interval = self.rng.random_range(0.3f32..0.7f32);
+        if self.speed < 0.0 {
+            self.speed = 0.0;
         }
     }
 
@@ -548,8 +547,6 @@ impl std::fmt::Display for Ant {
             "  steering_force: {{ x: {}, y: {} }}",
             self.steering_force.x, self.steering_force.y
         )?;
-
-        writeln!(f, "  intervals: {{ wobble: {} }}", self.wobble_interval)?;
 
         writeln!(f, "  sensors: [")?;
         writeln!(f, "    {{ left: {:?} }}", self.sensors.left)?;
