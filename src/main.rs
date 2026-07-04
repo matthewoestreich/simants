@@ -74,13 +74,15 @@ fn main() {
     let mut is_dragging = false;
     let mut is_pheromone_mode = false;
     let mut click_start_pos = Vector2::zero();
+    let mut fast_forward_multiplier = 1; // 1 is normal speed
 
     /* --------------------------------------- */
     /* ------------ Game Loop ---------------- */
     /* --------------------------------------- */
     while !rl.window_should_close() {
         if !is_paused {
-            world.update(rl.get_frame_time());
+            let dt = rl.get_frame_time() * fast_forward_multiplier as f32;
+            world.update(dt);
         }
 
         if renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
@@ -89,6 +91,7 @@ fn main() {
                 &mut renderer,
                 &mut is_paused,
                 &mut is_pheromone_mode,
+                &mut fast_forward_multiplier,
             );
             handle_mouse_wheel(&mut rl, &mut camera, &mut renderer);
             handle_mouse_click(
@@ -127,6 +130,15 @@ fn main() {
         if is_pheromone_mode {
             d.draw_text("PHEROMONE MODE ON", 10, 10, 20, Color::WHITE);
         }
+        if fast_forward_multiplier > 1 {
+            d.draw_text(
+                &format!(">> x{fast_forward_multiplier}"),
+                10,
+                30,
+                10,
+                Color::WHITE,
+            );
+        }
     }
 }
 
@@ -139,6 +151,7 @@ fn handle_key_press(
     renderer: &mut Renderer,
     is_paused: &mut bool,
     is_pheromone_mode: &mut bool,
+    fast_forward: &mut i32,
 ) {
     if *is_pheromone_mode {
         if rl.is_key_pressed(KeyboardKey::KEY_P) {
@@ -149,6 +162,13 @@ fn handle_key_press(
             renderer.toggle_show_pheromones("HOME");
         } else if rl.is_key_pressed(KeyboardKey::KEY_A) {
             renderer.toggle_show_pheromones("ALL");
+        }
+    } else if rl.is_key_pressed(KeyboardKey::KEY_F) {
+        *fast_forward += 1;
+        if *fast_forward == 6 {
+            *fast_forward = 10;
+        } else if *fast_forward >= 10 {
+            *fast_forward = 1;
         }
     } else if rl.is_key_pressed(KeyboardKey::KEY_A) {
         renderer.toggle_show_ants();
@@ -162,7 +182,7 @@ fn handle_key_press(
         renderer.toggle_show_ant_sensors();
     } else if rl.is_key_pressed(KeyboardKey::KEY_C) {
         renderer.toggle_show_colony();
-    } else if rl.is_key_pressed(KeyboardKey::KEY_F) {
+    } else if rl.is_key_pressed(KeyboardKey::KEY_O) {
         renderer.toggle_show_food();
     } else if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {
         *is_paused = !*is_paused;
