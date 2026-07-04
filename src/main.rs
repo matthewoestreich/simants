@@ -8,8 +8,6 @@ mod reynolds;
 mod settings;
 mod world;
 
-use std::collections::HashSet;
-
 use crate::{
     ant::AntColony,
     map::Grid,

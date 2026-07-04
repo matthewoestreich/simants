@@ -2,10 +2,10 @@ use crate::{
     ant::{Ant, AntColony, AntKind, AntState},
     map::{Grid, Terrain},
     settings::{
-        ANT_FORAGING_COLOR, ANT_LENGTH, ANT_RETURNING_FOOD_COLOR, ANT_WIDTH, BACKGROUND_COLOR,
-        COLONY_COLOR, FOOD_COLOR, GRID_COLS, GRID_ROWS, MAX_RGBA_VALUE, OBSTACLE_COLOR,
-        PHEROMONE_FORAGING_COLOR, PHEROMONE_RETURNING_FOOD_COLOR, SHOW_ANT_SENSORS, SHOW_ANTS,
-        SHOW_BORDER, SHOW_GRID_LINES, SHOW_PHEROMONES,
+        ANT_FORAGING_COLOR, ANT_LENGTH, ANT_PROJECTION_CIRCLE_RADIUS, ANT_RETURNING_FOOD_COLOR,
+        ANT_WIDTH, BACKGROUND_COLOR, COLONY_COLOR, FOOD_COLOR, GRID_COLS, GRID_ROWS,
+        MAX_RGBA_VALUE, OBSTACLE_COLOR, PHEROMONE_FORAGING_COLOR, PHEROMONE_RETURNING_FOOD_COLOR,
+        SHOW_ANT_SENSORS, SHOW_ANTS, SHOW_BORDER, SHOW_GRID_LINES, SHOW_PHEROMONES,
     },
     world::World,
 };
@@ -159,6 +159,8 @@ impl Renderer {
 
         d.draw_triangle(spear, left_back, right_back, ant_color);
 
+        // self.draw_ant_projection_circle(ant, d);
+
         if matches!(ant.kind, AntKind::Explorer { .. }) {
             d.draw_triangle_lines(spear, left_back, right_back, Color::YELLOW);
         }
@@ -185,6 +187,28 @@ impl Renderer {
                 d.draw_rectangle_v(pos, size, sensor_color);
             }
         }
+    }
+
+    pub fn draw_ant_projection_circle(&mut self, ant: &Ant, d: &mut impl RaylibDraw) {
+        // Determine grid positions using your saved fields
+        let absolute_circle_grid = ant.navigator.position + ant.navigator.wander_circle;
+        let absolute_dot_grid = absolute_circle_grid + ant.navigator.wander_circle_displacement;
+        // Map coordinates through your viewport matrix
+        let w_circle_center = self.viewport.grid_to_world(absolute_circle_grid);
+        let w_target_dot = self.viewport.grid_to_world(absolute_dot_grid);
+        let w_ant_center = self.viewport.grid_to_world(ant.navigator.position);
+        // Map a secondary point on the circle edge to determine the EXACT scaled pixel radius
+        let edge_grid_point = absolute_circle_grid
+            + (ant.navigator.velocity.normalize() * ANT_PROJECTION_CIRCLE_RADIUS);
+        let w_edge_point = self.viewport.grid_to_world(edge_grid_point);
+        let w_circle_radius = (w_edge_point - w_circle_center).length();
+        // Draw the perfect hollow border
+        d.draw_circle_lines_v(w_circle_center, w_circle_radius, Color::GRAY);
+        // Draw the guiding lines
+        d.draw_line_v(w_ant_center, w_circle_center, Color::LIGHTGRAY);
+        d.draw_line_v(w_circle_center, w_target_dot, Color::DARKGRAY);
+        // Draw the solid target point right on the outline
+        d.draw_circle_v(w_target_dot, 2.0, Color::DARKGRAY);
     }
 
     pub fn draw_grid(&mut self, grid: &mut Grid, d: &mut impl RaylibDraw) {

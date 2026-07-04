@@ -208,10 +208,12 @@ impl Ant {
         };
 
         grid.get_cell_mut(
-            self.navigator.position.x as u32,
-            self.navigator.position.y as u32,
+            self.navigator.position.x.floor() as u32,
+            self.navigator.position.y.floor() as u32,
         )
-        .expect("current position to always be valid, ant: {self:?}")
+        .expect(&format!(
+            "current position to always be valid, ant: {self:?}"
+        ))
     }
 
     pub fn calculate_next_position(&mut self, delta_time: f32) -> Option<Vector2> {

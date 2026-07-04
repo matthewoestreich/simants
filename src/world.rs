@@ -1,7 +1,10 @@
 use crate::{
     ant::AntColony,
     map::{Grid, Terrain},
-    settings::{ANT_MAX_PHEROMONE_CAPACITY, ANT_PHEROMONE_LOSS_RATE, PHEROMONE_DECAY_RATE},
+    settings::{
+        ANT_MAX_PHEROMONE_CAPACITY, ANT_OBSTACLE_PANIC_ANGLE_MAX, ANT_OBSTACLE_PANIC_ANGLE_MIN,
+        ANT_PHEROMONE_LOSS_RATE, PHEROMONE_DECAY_RATE,
+    },
 };
 
 pub struct World {
@@ -43,7 +46,8 @@ impl World {
                     current_cell.food = (current_cell.food - harvested_amount).max(0.0);
                     ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                     //ant.turn_in_any_direction();
-                    ant.navigator.turn_around();
+                    ant.navigator
+                        .turn_around(ANT_OBSTACLE_PANIC_ANGLE_MIN..ANT_OBSTACLE_PANIC_ANGLE_MAX);
                     continue;
                 }
                 // Deliver food to colony
@@ -53,7 +57,9 @@ impl World {
                         self.colony.harvested_food += ant.deliver_food();
                         ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                         //ant.turn_in_any_direction();
-                        ant.navigator.turn_around();
+                        ant.navigator.turn_around(
+                            ANT_OBSTACLE_PANIC_ANGLE_MIN..ANT_OBSTACLE_PANIC_ANGLE_MAX,
+                        );
                     } else {
                         _ = ant.navigator.seek(colony_center, delta_time);
                         //ant.steer_towards_position(colony_center, delta_time);
@@ -78,7 +84,8 @@ impl World {
                 if let Some(c) = self.grid.get_cell(cell_pos.0, cell_pos.1)
                     && c.is_obstruction()
                 {
-                    ant.navigator.turn_around();
+                    ant.navigator
+                        .turn_around(ANT_OBSTACLE_PANIC_ANGLE_MIN..ANT_OBSTACLE_PANIC_ANGLE_MAX);
                 } else {
                     let distance_traveled_cm = ant.navigator.position.distance(ant.last_position);
                     if delta_time > 0.0 {

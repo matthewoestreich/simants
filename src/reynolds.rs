@@ -1,5 +1,9 @@
+use std::ops::Range;
+
 use rand::RngExt;
 use raylib::ffi::Vector2;
+
+use crate::settings::{ANT_PROJECTION_CIRCLE_DISTANCE, ANT_PROJECTION_CIRCLE_RADIUS};
 
 #[derive(Debug, Default, Clone)]
 pub struct Navigation {
@@ -10,6 +14,9 @@ pub struct Navigation {
     pub max_force: f32,
 
     pub current_steering_force: Vector2,
+
+    pub wander_circle: Vector2,
+    pub wander_circle_displacement: Vector2,
 
     rng: rand::rngs::ThreadRng,
 }
@@ -29,6 +36,8 @@ impl Navigation {
             max_speed,
             max_force,
             rng: rand::rng(),
+            wander_circle: Vector2::default(),
+            wander_circle_displacement: Vector2::default(),
             current_steering_force: Vector2::default(),
         }
     }
@@ -39,18 +48,16 @@ impl Navigation {
     }
 
     /// Instantly flips the ant's movement direction 180 degrees
-    pub fn turn_around(&mut self) {
-        // Reverse the velocity vector to head in the exact opposite direction
-        self.velocity = -self.velocity;
+    pub fn turn_around(&mut self, panic_angle_range: Range<f32>) {
+        self.velocity *= -1.0;
+        let panic_angle = self.rng.random_range(panic_angle_range).to_radians();
+        self.velocity = self.velocity.rotate(panic_angle);
 
-        // Mirror the steering force so it doesn't fight the new direction
-        self.current_steering_force = -self.current_steering_force;
+        // 2. Mirror and rotate the wander angle so the wander target
+        // stays directly in front of the ant's new heading
+        self.wander_angle += std::f32::consts::PI + panic_angle;
 
-        // Rotate the wander angle by PI radians (180 degrees)
-        // This ensures the next wander step stays aligned with the new heading
-        self.wander_angle += std::f32::consts::PI;
-
-        // Keep the angle bounded between -PI and PI to prevent eventual float overflow
+        // 3. Keep the angle bounded between -PI and PI to prevent float overflow
         if self.wander_angle > std::f32::consts::PI {
             self.wander_angle -= 2.0 * std::f32::consts::PI;
         } else if self.wander_angle < -std::f32::consts::PI {
@@ -59,10 +66,12 @@ impl Navigation {
     }
 
     pub fn wander(&mut self, delta_time: f32) -> Vector2 {
-        let circle_radius = 20.0;
-        let circle_distance = 50.0;
+        // ORIGINAL VALUE : 20.0;
+        let circle_radius = ANT_PROJECTION_CIRCLE_RADIUS;
+        // ORIGINAL VALUE : 50.0;
+        let circle_distance = ANT_PROJECTION_CIRCLE_DISTANCE;
         // Limits how violently the ant changes direction
-        let change = 2.0; // Slightly higher value since it is now scaled by delta_time (was 0.5) 
+        let change = 8.0; //2.0; // Slightly higher value since it is now scaled by delta_time (was 0.5) 
 
         // Scaled the random angle change by delta_time so wandering speeds up when fast-forwarding
         let random_offset = self.rng.random_range::<f32, _>(-1.0..=1.0);
@@ -81,6 +90,9 @@ impl Navigation {
             self.wander_angle.cos() * circle_radius,
             self.wander_angle.sin() * circle_radius,
         );
+
+        self.wander_circle = circle_center;
+        self.wander_circle_displacement = displacement;
 
         // Combine them to get the final target force vector
         let wander_force = circle_center + displacement;
