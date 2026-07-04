@@ -29,16 +29,9 @@ fn main() {
         .size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .build();
 
-    let world_panel_x = (WINDOW_WIDTH - WORLD_WIDTH) / 2;
-    let world_panel_y = (WINDOW_HEIGHT - WORLD_HEIGHT) / 2;
-    let world_panel = WorldPanel::new(
-        world_panel_x,
-        world_panel_y,
-        WORLD_WIDTH,
-        WORLD_HEIGHT,
-        GRID_COLS,
-        GRID_ROWS,
-    );
+    let wp_x = (WINDOW_WIDTH - WORLD_WIDTH) / 2;
+    let wp_y = (WINDOW_HEIGHT - WORLD_HEIGHT) / 2;
+    let world_panel = WorldPanel::new(wp_x, wp_y, WORLD_WIDTH, WORLD_HEIGHT, GRID_COLS, GRID_ROWS);
 
     let cell_size = world_panel.cell_size;
 
@@ -60,15 +53,13 @@ fn main() {
     let mut world = World::new(grid, colony);
 
     let mut camera = Camera2D {
-        // 1. Point the camera target at the middle of your simulation map (in world pixels)
         target: Vector2::new(
             (GRID_COLS as f32 * cell_size.x) / 2.0,
             (GRID_ROWS as f32 * cell_size.y) / 2.0,
         ),
-        // 2. Center that target point precisely inside your screen's world panel frame
         offset: Vector2::new(
-            world_panel_x as f32 + (WORLD_WIDTH as f32 / 2.0),
-            world_panel_y as f32 + (WORLD_HEIGHT as f32 / 2.0),
+            wp_x as f32 + (WORLD_WIDTH as f32 / 2.0),
+            wp_y as f32 + (WORLD_HEIGHT as f32 / 2.0),
         ),
         rotation: 0.0,
         zoom: 1.0,
@@ -90,11 +81,10 @@ fn main() {
         }
 
         let mouse_pos = rl.get_mouse_position();
-
-        if mouse_pos.x >= world_panel_x as f32
-            && mouse_pos.x <= (world_panel_x + WORLD_WIDTH) as f32
-            && mouse_pos.y >= world_panel_y as f32
-            && mouse_pos.y <= (world_panel_y + WORLD_HEIGHT) as f32
+        if mouse_pos.x >= wp_x as f32
+            && mouse_pos.x <= (wp_x + WORLD_WIDTH) as f32
+            && mouse_pos.y >= wp_y as f32
+            && mouse_pos.y <= (wp_y + WORLD_HEIGHT) as f32
         {
             handle_key_press(
                 &mut rl,
@@ -117,8 +107,7 @@ fn main() {
         d.clear_background(BACKGROUND_COLOR);
 
         {
-            let mut scissor =
-                d.begin_scissor_mode(world_panel_x, world_panel_y, WORLD_WIDTH, WORLD_HEIGHT);
+            let mut scissor = d.begin_scissor_mode(wp_x, wp_y, WORLD_WIDTH, WORLD_HEIGHT);
             let mut mode2d = scissor.begin_mode2D(camera);
             renderer.draw_world(&mut world, &mut mode2d);
         }
@@ -271,79 +260,6 @@ fn handle_mouse_click(
 
         println!("Right clicked World Pixels = {:?}", clicked_world);
         println!("Calculated Grid Slots = X: {}, Y: {}", x, y);
-
-        if let Some(cell) = world.grid.get_cell(x, y) {
-            println!("{cell:?}");
-            if cell.is_colony() {
-                println!(
-                    "Colony has harvested : '{}' food",
-                    world.colony.harvested_food
-                );
-            }
-        }
-    }
-}
-
-fn handle_mouse_click_og(
-    rl: &mut RaylibHandle,
-    camera: &mut Camera2D,
-    world: &mut World,
-    world_panel: &WorldPanel,
-    is_dragging: &mut bool,
-    click_start_pos: &mut Vector2,
-) {
-    const DRAG_THRESHOLD: f32 = 5.0;
-
-    if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-        *click_start_pos = rl.get_mouse_position();
-        *is_dragging = false;
-    }
-
-    if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
-        let current_pos = rl.get_mouse_position();
-
-        if !*is_dragging && current_pos.distance(*click_start_pos) > DRAG_THRESHOLD {
-            *is_dragging = true;
-        }
-
-        if *is_dragging {
-            let mouse_delta = rl.get_mouse_delta();
-            let drag_vector =
-                Vector2::new(mouse_delta.x / camera.zoom, mouse_delta.y / camera.zoom);
-            camera.target.x -= drag_vector.x;
-            camera.target.y -= drag_vector.y;
-        }
-    }
-
-    if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
-        if !*is_dragging {
-            let click_position = rl.get_mouse_position();
-            let click_world_position = world_panel.screen_to_world(click_position);
-
-            println!(
-                "world_panel= {world_panel:?} | \nclicked_position= {click_position:?}\nclick_world_pos= {click_world_position:?}"
-            );
-
-            if let Some(ant) = world
-                .colony
-                .ants
-                .iter()
-                .find(|ant| ant.is_clicked(click_world_position, 3.0f32))
-            {
-                println!("{ant}");
-            }
-            println!();
-        }
-        *is_dragging = false;
-    }
-
-    if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_RIGHT) {
-        let clicked_screen = rl.get_mouse_position();
-        //let clicked_world = rl.get_screen_to_world2D(clicked_screen, *camera);
-        let clicked_world = world_panel.screen_to_world(clicked_screen);
-
-        println!("clicked_world = {:?}", clicked_world);
-        let (x, y) = world.grid.world_to_cell(clicked_world);
 
         if let Some(cell) = world.grid.get_cell(x, y) {
             println!("{cell:?}");
