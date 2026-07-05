@@ -7,7 +7,7 @@ use crate::{
         ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE, EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE,
     },
 };
-use rand::RngExt as _;
+use rand::{RngExt as _, rngs::SmallRng};
 use raylib::ffi::Vector2;
 
 /* ---------------------------------------------------------------- */
@@ -39,13 +39,14 @@ impl AntColony {
         percent_of_explorer_ants: f32,
         radius: f32,
         position: Vector2,
+        rng: &mut SmallRng,
     ) -> Self {
         let mut this = Self::new(num_ants, radius, position);
-        this.spawn_ants(percent_of_explorer_ants);
+        this.spawn_ants(percent_of_explorer_ants, rng);
         this
     }
 
-    pub fn spawn_ants(&mut self, percent_of_explorer_ants: f32) {
+    pub fn spawn_ants(&mut self, percent_of_explorer_ants: f32, rng: &mut SmallRng) {
         let len = if !self.ants.is_empty() {
             self.ants.len()
         } else if self.ants.capacity() > 0 {
@@ -62,7 +63,7 @@ impl AntColony {
 
             ant.id = i as i32;
             if pcnt > 0.0 {
-                let sec_remaining = ant.rng.random_range(EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE);
+                let sec_remaining = rng.random_range(EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE);
                 ant.kind = AntKind::Explorer {
                     start: sec_remaining,
                     stop: 0.0,
@@ -144,7 +145,6 @@ pub struct Ant {
 
     pheromone_tank: f32,
     sensors: Sensors,
-    rng: rand::rngs::ThreadRng,
 }
 
 impl Ant {
@@ -154,8 +154,6 @@ impl Ant {
         let vel = Vector2::new(forward_direction.cos(), forward_direction.sin());
 
         Self {
-            //position,
-            rng,
             navigator: Navigation::new(
                 position,
                 vel,
@@ -215,11 +213,11 @@ impl Ant {
         ))
     }
 
-    pub fn calculate_next_position(&mut self, delta_time: f32) -> Vector2 {
-        if let Some(escape_position) = self.avoid_obstruction(delta_time) {
+    pub fn calculate_next_position(&mut self, delta_time: f32, rng: &mut SmallRng) -> Vector2 {
+        if let Some(escape_position) = self.avoid_obstruction(delta_time, rng) {
             escape_position
         } else if self.is_exploring() {
-            self.navigator.wander(delta_time)
+            self.navigator.wander(delta_time, rng)
         } else if self.is_foraging()
             && let Some(pos) = self.sense_terrain(Terrain::Food)
         {
@@ -231,13 +229,13 @@ impl Ant {
         } else if let Some(pos) = self.steer_towards_pheromone() {
             self.navigator.seek(pos, delta_time)
         } else {
-            self.navigator.wander(delta_time)
+            self.navigator.wander(delta_time, rng)
         }
     }
 
-    fn avoid_obstruction(&mut self, delta_time: f32) -> Option<Vector2> {
+    fn avoid_obstruction(&mut self, delta_time: f32, rng: &mut SmallRng) -> Option<Vector2> {
         if self.sensors.center.reading.terrain.is_obstruction() {
-            Some(self.navigator.turn_around(0.1..30.0, delta_time))
+            Some(self.navigator.turn_around(0.1..30.0, delta_time, rng))
         } else if self.sensors.left.reading.terrain.is_obstruction()
             && let Some(_obs) = self.sensors.left.location
         {
@@ -355,20 +353,19 @@ impl Ant {
         self.last_position = self.navigator.position;
     }
 
-    pub fn try_harvest_food(&mut self, current_cell: &mut Cell) {
+    pub fn try_harvest_food(&mut self, current_cell: &mut Cell, rng: &mut SmallRng) {
         if !self.is_foraging() || !current_cell.has_food() {
             return;
         }
-        let harvested_amount = self.harvest(current_cell.food);
+        let harvested_amount = self.harvest(current_cell.food, rng);
         current_cell.food = (current_cell.food - harvested_amount).max(0.0);
         self.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
     }
 
     // Gets a random number from ANT_HARVEST_AMOUNT_RANGE and takes it from
     // capacity_to_harvest_from, then returns amount harvested
-    fn harvest(&mut self, capacity_to_harvest_from: f32) -> f32 {
-        let amount = self
-            .rng
+    fn harvest(&mut self, capacity_to_harvest_from: f32, rng: &mut SmallRng) -> f32 {
+        let amount = rng
             .random_range(ANT_HARVEST_AMOUNT_RANGE)
             .min(capacity_to_harvest_from);
         self.harvest_amount(amount)
@@ -401,17 +398,17 @@ impl Ant {
         None
     }
 
-    pub fn handle_pause(&mut self, decrease_pause_time_by: f32) {
+    pub fn handle_pause(&mut self, decrease_pause_time_by: f32, rng: &mut SmallRng) {
         if self.paused > 0.0 {
             self.pheromone_tank += 0.001;
             self.paused = (self.paused - decrease_pause_time_by).max(0.0);
-        } else if self.should_pause(ANT_PAUSE_PROBABILITY) {
-            self.paused = self.rng.random_range(ANT_PAUSE_FOR_RANGE_IN_SEC);
+        } else if self.should_pause(ANT_PAUSE_PROBABILITY, rng) {
+            self.paused = rng.random_range(ANT_PAUSE_FOR_RANGE_IN_SEC);
         }
     }
 
     /// Returns `true` if we are exploring, `false` if not.
-    pub fn explore(&mut self, delta_time: f32) -> bool {
+    pub fn explore(&mut self, delta_time: f32, rng: &mut SmallRng) -> bool {
         let AntKind::Explorer { start, stop } = &mut self.kind else {
             return false;
         };
@@ -421,7 +418,7 @@ impl Ant {
             *stop -= delta_time;
 
             if *stop <= 0.0 {
-                *start = self.rng.random_range(5.0..10.0);
+                *start = rng.random_range(5.0..10.0);
                 *stop = 0.0;
                 return false;
             }
@@ -437,9 +434,9 @@ impl Ant {
         }
 
         *start = 0.0;
-        *stop = self.rng.random_range(5.0..10.0);
+        *stop = rng.random_range(5.0..10.0);
 
-        _ = self.navigator.wander(delta_time);
+        _ = self.navigator.wander(delta_time, rng);
 
         true
     }
@@ -489,8 +486,8 @@ impl Ant {
 
     /// `probability_of_pausing` should be >= 0.0 and <= 1.0.
     /// If `probability_of_pausing` === 0.2 then there is a 20% chance o pausing.
-    pub fn should_pause(&mut self, probability_of_pausing: f64) -> bool {
-        !self.is_paused() && self.rng.random::<f64>() < probability_of_pausing
+    pub fn should_pause(&mut self, probability_of_pausing: f64, rng: &mut SmallRng) -> bool {
+        !self.is_paused() && rng.random::<f64>() < probability_of_pausing
     }
 }
 

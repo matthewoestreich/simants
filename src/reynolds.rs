@@ -1,5 +1,5 @@
 use crate::settings::{ANT_PROJECTION_CIRCLE_DISTANCE, ANT_PROJECTION_CIRCLE_RADIUS};
-use rand::RngExt as _;
+use rand::{RngExt as _, rngs::SmallRng};
 use raylib::prelude::*;
 use std::ops::Range;
 
@@ -13,7 +13,6 @@ pub struct Navigation {
     pub current_steering_force: Vector2,
     pub wander_circle: Vector2,
     pub wander_circle_displacement: Vector2,
-    rng: rand::rngs::ThreadRng,
 }
 
 impl Navigation {
@@ -30,7 +29,6 @@ impl Navigation {
             wander_angle,
             max_speed,
             max_force,
-            rng: rand::rng(),
             wander_circle: Vector2::default(),
             wander_circle_displacement: Vector2::default(),
             current_steering_force: Vector2::default(),
@@ -44,13 +42,13 @@ impl Navigation {
 
     /// Calculates wander force using delta_time for angle drift,
     /// executes physics mutation, and returns the updated position.
-    pub fn wander(&mut self, delta_time: f32) -> Vector2 {
+    pub fn wander(&mut self, delta_time: f32, rng: &mut SmallRng) -> Vector2 {
         let circle_radius = ANT_PROJECTION_CIRCLE_RADIUS;
         let circle_distance = ANT_PROJECTION_CIRCLE_DISTANCE;
         let change = 4.0;
 
         // Safely scale the random angle change by delta_time for stable fast-forwarding
-        let random_offset = self.rng.random_range::<f32, _>(-1.0..=1.0);
+        let random_offset = rng.random_range::<f32, _>(-1.0..=1.0);
         self.wander_angle += random_offset * change * delta_time;
 
         let mut circle_center = self.velocity;
@@ -85,8 +83,9 @@ impl Navigation {
     pub fn seek(&mut self, target: Vector2, delta_time: f32) -> Vector2 {
         let mut desired = target - self.position;
 
-        if desired.length() > 0.0 {
-            desired = desired.normalize() * self.max_speed;
+        let d_len = desired.length();
+        if d_len > 0.0 {
+            desired *= self.max_speed / d_len;
         }
 
         let steering_force = desired - self.velocity;
@@ -159,10 +158,15 @@ impl Navigation {
 
     /// Instantly flips velocity and wander vectors 180 degrees,
     /// processes the physical position step, and returns the new position.
-    pub fn turn_around(&mut self, panic_angle: Range<f32>, delta_time: f32) -> Vector2 {
+    pub fn turn_around(
+        &mut self,
+        panic_angle: Range<f32>,
+        delta_time: f32,
+        rng: &mut SmallRng,
+    ) -> Vector2 {
         // 1. Flip and rotate velocity exactly like your original panic-angle code
         self.velocity *= -1.0;
-        let panic_angle = self.rng.random_range(panic_angle).to_radians();
+        let panic_angle = rng.random_range(panic_angle).to_radians();
         self.velocity = self.velocity.rotate(panic_angle);
 
         // 2. Mirror and rotate the wander angle so the wander target circle

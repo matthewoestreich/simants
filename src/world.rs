@@ -3,18 +3,24 @@ use crate::{
     map::{Grid, Terrain},
     settings::PHEROMONE_DECAY_RATE,
 };
+use rand::rngs::SmallRng;
 
 pub struct World {
     pub colony: AntColony,
     pub grid: Grid,
+    pub rng: rand::rngs::ThreadRng,
 }
 
 impl World {
     pub fn new(grid: Grid, colony: AntColony) -> Self {
-        Self { grid, colony }
+        Self {
+            grid,
+            colony,
+            rng: rand::rng(),
+        }
     }
 
-    pub fn update(&mut self, delta_time: f32) {
+    pub fn update(&mut self, delta_time: f32, rng: &mut SmallRng) {
         for cell in self.grid.iter_mut() {
             match cell.terrain {
                 Terrain::Food if cell.food <= 0.0 => cell.terrain = Terrain::Empty,
@@ -26,7 +32,7 @@ impl World {
         let colony_center = self.colony.position;
 
         for ant in &mut self.colony.ants {
-            ant.handle_pause(delta_time);
+            ant.handle_pause(delta_time, rng);
             if ant.is_paused() {
                 ant.real_speed_cm_s = 0.0;
                 continue;
@@ -34,19 +40,21 @@ impl World {
 
             let current_cell = ant.sense_environment(&mut self.grid);
 
-            if !ant.explore(delta_time) {
-                if let Some(delivered) = ant.deliver_food(&colony_center) {
-                    self.colony.harvested_food += delivered;
-                } else if current_cell.is_colony() {
-                    _ = ant.navigator.seek(colony_center, delta_time);
+            if !ant.explore(delta_time, rng) {
+                if ant.is_returning_food() {
+                    if let Some(delivered) = ant.deliver_food(&colony_center) {
+                        self.colony.harvested_food += delivered;
+                    } else if current_cell.is_colony() {
+                        _ = ant.navigator.seek(colony_center, delta_time);
+                    }
                 } else {
-                    ant.try_harvest_food(current_cell);
+                    ant.try_harvest_food(current_cell, rng);
                 }
             }
 
             ant.place_pheromone(current_cell, delta_time);
             ant.update_speed(delta_time);
-            ant.calculate_next_position(delta_time);
+            ant.calculate_next_position(delta_time, rng);
         }
     }
 

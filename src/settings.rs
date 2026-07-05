@@ -20,8 +20,8 @@ pub const ANT_MAX_SPEED: f32 = 2.5; // (2.5 seems stable) cm/s with bursts that 
 pub const ANT_HARVEST_AMOUNT_RANGE: Range<f32> = 10.0..50.0;
 
 // The longer an ant walks, the weaker the pheromones it drops are.
-pub const ANT_PHEROMONE_LOSS_RATE: f32 = 0.2;
-pub const ANT_MAX_PHEROMONE_CAPACITY: f32 = 600.0;
+pub const ANT_PHEROMONE_LOSS_RATE: f32 = 0.4;
+pub const ANT_MAX_PHEROMONE_CAPACITY: f32 = 200.0;
 
 pub const ANT_MAX_TURN_FORCE: f32 = 15.0;
 pub const ANT_TURN_ANGLE: f32 = 30.0;
@@ -77,7 +77,7 @@ pub const TITLE: &str = "Ant Simulation";
 pub const WINDOW_WIDTH: i32 = 1200;
 pub const WINDOW_HEIGHT: i32 = 800;
 
-pub const WORLD_WIDTH: i32 = 800;
+pub const WORLD_WIDTH: i32 = 1000;
 pub const WORLD_HEIGHT: i32 = 600;
 
 pub const GRID_COLS: u32 = 300; //300;

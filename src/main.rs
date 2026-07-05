@@ -8,6 +8,8 @@ mod reynolds;
 mod settings;
 mod world;
 
+use std::time::{Duration, Instant};
+
 use crate::{
     ant::AntColony,
     map::Grid,
@@ -18,6 +20,7 @@ use crate::{
     },
     world::World,
 };
+use rand::rngs::SmallRng;
 use raylib::{
     RaylibHandle,
     ffi::{Camera2D, Color, KeyboardKey, MouseButton, Vector2},
@@ -39,6 +42,8 @@ fn main() {
         GRID_ROWS,
     );
 
+    let mut rng: SmallRng = rand::make_rng();
+
     let mut renderer = Renderer::new(viewport);
 
     let colony = AntColony::new_with_immediate_spawn(
@@ -49,6 +54,7 @@ fn main() {
             (GRID_COLS as f32 / 8.0).floor(),
             (GRID_ROWS as f32 / 2.0).floor(),
         ),
+        &mut rng,
     );
 
     let mut grid = Grid::new(GRID_COLS, GRID_ROWS);
@@ -81,23 +87,15 @@ fn main() {
     /* ------------ Game Loop ---------------- */
     /* --------------------------------------- */
     while !rl.window_should_close() {
+        let update_start = Instant::now();
+        let mut update_time = Duration::default();
         if !is_paused {
-            let dt = rl.get_frame_time() * fast_forward_multiplier;
-            world.update(dt);
-            //if fast_forward_multiplier > 1.0 {
-            //    // Fast-forward splits the work into stable, tiny slices!
-            //    // Example: at 10x speed, we loop 10 times, passing a safe 1x delta_time each loop
-            //    let steps = fast_forward_multiplier.floor() as i32;
-            //    println!("steps {steps}");
-            //    let step_dt = 0.01666667;
-            //    for _ in 0..steps {
-            //        world.update(step_dt);
-            //    }
-            //} else {
-            //    world.update(dt);
-            //}
+            let dt = rl.get_frame_time();
+            world.update(dt, &mut rng);
+            update_time = update_start.elapsed();
         }
 
+        /*
         if renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
             handle_key_press(
                 &mut rl,
@@ -116,10 +114,28 @@ fn main() {
                 &mut click_start_pos,
             );
         }
+        */
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
 
+        let fps = d.get_fps();
+        d.draw_text(
+            &format!("{fps} fps"),
+            WORLD_WIDTH - 20,
+            10,
+            20,
+            Color::WHITE,
+        );
+        d.draw_text(
+            &format!("Update: {update_time:?}"),
+            WORLD_WIDTH - 20,
+            50,
+            10,
+            Color::WHITE,
+        );
+
+        let now = Instant::now();
         {
             let mut scissor = d.begin_scissor_mode(
                 renderer.viewport.x,
@@ -128,8 +144,17 @@ fn main() {
                 renderer.viewport.height,
             );
             let mut mode2d = scissor.begin_mode2D(camera);
+
             renderer.draw_world(&mut world, &mut mode2d);
         }
+        let duration = now.elapsed();
+        d.draw_text(
+            &format!("Render: {duration:?}"),
+            WORLD_WIDTH - 20,
+            30,
+            10,
+            Color::WHITE,
+        );
 
         // Bordr around viewport
         d.draw_rectangle_lines(
