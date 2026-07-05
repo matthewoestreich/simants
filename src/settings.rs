@@ -81,8 +81,8 @@ pub const WINDOW_HEIGHT: i32 = 800;
 pub const WORLD_WIDTH: i32 = 1000;
 pub const WORLD_HEIGHT: i32 = 600;
 
-pub const GRID_COLS: u32 = 300; //300;
-pub const GRID_ROWS: u32 = 200; //200;
+pub const GRID_COLS: u32 = 500; //300;
+pub const GRID_ROWS: u32 = 400; //200;
 
 /* ----------------------------------- */
 /* ------- Color Options ------------- */
