@@ -78,25 +78,17 @@ impl World {
                 ant.lose_pheromones(lost);
             }
 
-            // Handle movement
-            if let Some(next_position) = ant.calculate_next_position(delta_time) {
-                let cell_pos = self.grid.world_to_cell(next_position);
-                if let Some(c) = self.grid.get_cell(cell_pos.0, cell_pos.1)
-                    && c.is_obstruction()
-                {
-                    ant.navigator
-                        .turn_around(ANT_OBSTACLE_PANIC_ANGLE_MIN..ANT_OBSTACLE_PANIC_ANGLE_MAX);
-                } else {
-                    let distance_traveled_cm = ant.navigator.position.distance(ant.last_position);
-                    if delta_time > 0.0 {
-                        ant.real_speed_cm_s = distance_traveled_cm / delta_time;
-                    } else {
-                        ant.real_speed_cm_s = 0.0;
-                    }
-                    ant.last_position = ant.navigator.position;
-                    ant.navigator.position = next_position;
-                }
+            // Calculate ants speed
+            let distance_traveled_cm = ant.navigator.position.distance(ant.last_position);
+            if delta_time > 0.0 {
+                ant.real_speed_cm_s = distance_traveled_cm / delta_time;
+            } else {
+                ant.real_speed_cm_s = 0.0;
             }
+            ant.last_position = ant.navigator.position;
+
+            // Handle movement
+            _ = ant.calculate_next_position(delta_time);
         }
     }
 

@@ -6,12 +6,12 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 100;
-pub const PERCENT_OF_EXPLORER_ANTS: f32 = 0.0;
+pub const NUM_ANTS: usize = 12_000;
+pub const PERCENT_OF_EXPLORER_ANTS: f32 = 3.0;
 // When an explorer ants time to explore runs out, it goes exploring.
 // We pick a random number in this range so not all ants go exploring at the same time.
 pub const EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE: Range<f32> = 5.0..10.0;
-pub const ANT_LENGTH: f32 = 3.2; // in cm. 1.2 = 1.2cm
+pub const ANT_LENGTH: f32 = 1.2; // in cm. 1.2 = 1.2cm
 pub const ANT_WIDTH: f32 = 0.4; // in cm. 0.4 = 0.4cm
 // Pixels per second
 pub const ANT_MAX_SPEED: f32 = 2.5; // (2.5 seems stable) cm/s with bursts that go higher

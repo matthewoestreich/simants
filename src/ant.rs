@@ -216,57 +216,40 @@ impl Ant {
         ))
     }
 
-    pub fn calculate_next_position(&mut self, delta_time: f32) -> Option<Vector2> {
-        if self.is_exploring() {
-            Some(self.navigator.wander(delta_time))
+    pub fn calculate_next_position(&mut self, delta_time: f32) -> Vector2 {
+        if let Some(escape_position) = self.avoid_obstruction(delta_time) {
+            escape_position
+        } else if self.is_exploring() {
+            self.navigator.wander(delta_time)
         } else if self.is_foraging()
-            && let Some(pos) = self.steer_towards_terrain(Terrain::Food)
+            && let Some(pos) = self.sense_terrain(Terrain::Food)
         {
-            Some(self.navigator.seek(pos, delta_time))
+            self.navigator.seek(pos, delta_time)
         } else if self.is_returning_food()
-            && let Some(pos) = self.steer_towards_terrain(Terrain::Colony)
+            && let Some(pos) = self.sense_terrain(Terrain::Colony)
         {
-            Some(self.navigator.seek(pos, delta_time))
+            self.navigator.seek(pos, delta_time)
         } else if let Some(pos) = self.steer_towards_pheromone() {
-            Some(self.navigator.seek(pos, delta_time))
+            self.navigator.seek(pos, delta_time)
         } else {
-            Some(self.navigator.wander(delta_time))
+            self.navigator.wander(delta_time)
         }
-        /*
-        let steering_angle = {
-            if self.is_exploring() {
-                self.get_random_wander_angle().to_radians()
-            }
-            // If we are looking for food and spotted food.
-            else if self.is_foraging()
-                && let Some(angle) = self.steer_towards_terrain(Terrain::Food)
-            {
-                angle.to_radians()
-            }
-            // If we are returning food and spotted the colony, steer towards it.
-            else if self.is_returning_food()
-                && let Some(angle) = self.steer_towards_terrain(Terrain::Colony)
-            {
-                angle.to_radians()
-            }
-            // Pheromone based steering, try to sense pheromones to tell us where to go
-            else if let Some(angle) = self.steer_towards_pheromone() {
-                angle.to_radians()
-            }
-            // No pheromones found, wander randomly
-            else {
-                let a = self.get_random_wander_angle().to_radians();
-                if self.is_returning_food() {
-                    println!("calculate_next_position : random wander angle = {a}");
-                }
-                a
-            }
-        };
+    }
 
-        self.apply_steering(steering_angle, delta_time);
-        self.apply_speed_wobble(ANT_MAX_SPEED, delta_time);
-        Some(self.position + self.velocity * delta_time)
-        */
+    fn avoid_obstruction(&mut self, delta_time: f32) -> Option<Vector2> {
+        if self.sensors.center.reading.terrain.is_obstruction() {
+            Some(self.navigator.turn_around(0.0..30.0))
+        } else if self.sensors.left.reading.terrain.is_obstruction()
+            && let Some(_obs) = self.sensors.left.location
+        {
+            Some(self.navigator.turn_right(delta_time))
+        } else if self.sensors.right.reading.terrain.is_obstruction()
+            && let Some(_obs) = self.sensors.right.location
+        {
+            Some(self.navigator.turn_left(delta_time))
+        } else {
+            None
+        }
     }
 
     /// Uses ants sensor readings to determine if the provided terrain was even sensed, and if
@@ -274,7 +257,7 @@ impl Ant {
     /// For every sensor that sensed provided terrain, we compare their values and return the
     /// strongest value.
     // If the provided terrain is not sensed we return None and thereore do not change steering.
-    fn steer_towards_terrain(&self, t: Terrain) -> Option<Vector2> {
+    fn sense_terrain(&self, t: Terrain) -> Option<Vector2> {
         let left = self.sensors.left.reading;
         let center = self.sensors.center.reading;
         let right = self.sensors.right.reading;
@@ -282,28 +265,28 @@ impl Ant {
         // Use a negative value as a "flag" for if the expected terrain was even found.
         let mut strongest = -1.0;
         //let mut angle = None;
-        let mut next_position = None;
+        let mut sensed_location = None;
 
         if left.terrain == t {
             strongest = left.target_pheromone;
-            next_position = self.sensors.left.location;
+            sensed_location = self.sensors.left.location;
             //angle = Some(-ANT_SENSOR_ANGLE);
         }
         if center.terrain == t && (strongest < 0.0 || center.target_pheromone > strongest) {
             strongest = center.target_pheromone;
-            next_position = self.sensors.center.location;
+            sensed_location = self.sensors.center.location;
             //angle = Some(0.0f32);
         }
         if right.terrain == t {
             #[allow(unused_assignments)]
             if strongest < 0.0 || right.target_pheromone > strongest {
                 strongest = right.target_pheromone;
-                next_position = self.sensors.right.location;
+                sensed_location = self.sensors.right.location;
                 //angle = Some(ANT_SENSOR_ANGLE);
             }
         }
 
-        next_position
+        sensed_location
         // angle
     }
 

@@ -256,7 +256,7 @@ impl Renderer {
                 d.draw_rectangle(
                     draw.x as i32,
                     draw.y as i32,
-                    self.viewport.cell_size.x as i32,
+                    self.viewport.cell_size.x as i32 + 1,
                     self.viewport.cell_size.y as i32,
                     color,
                 );

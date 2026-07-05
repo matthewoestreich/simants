@@ -83,18 +83,19 @@ fn main() {
     while !rl.window_should_close() {
         if !is_paused {
             let dt = rl.get_frame_time() * fast_forward_multiplier;
-
-            if fast_forward_multiplier > 1.0 {
-                // Fast-forward splits the work into stable, tiny slices!
-                // Example: at 10x speed, we loop 10 times, passing a safe 1x delta_time each loop
-                let steps = fast_forward_multiplier.floor() as i32;
-                let step_dt = 0.01666667;
-                for _ in 0..steps {
-                    world.update(step_dt);
-                }
-            }
-
             world.update(dt);
+            //if fast_forward_multiplier > 1.0 {
+            //    // Fast-forward splits the work into stable, tiny slices!
+            //    // Example: at 10x speed, we loop 10 times, passing a safe 1x delta_time each loop
+            //    let steps = fast_forward_multiplier.floor() as i32;
+            //    println!("steps {steps}");
+            //    let step_dt = 0.01666667;
+            //    for _ in 0..steps {
+            //        world.update(step_dt);
+            //    }
+            //} else {
+            //    world.update(dt);
+            //}
         }
 
         if renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
