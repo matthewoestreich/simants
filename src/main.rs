@@ -81,9 +81,10 @@ fn main() {
     let mut is_dragging = false;
     let mut is_pheromone_mode = false;
     let mut click_start_pos = Vector2::zero();
-    let mut fast_forward_multiplier = 1.0; // 1 is normal speed
+    let mut is_fast_forwarding = false;
 
-    let mut stats_update_interval = 0.0f32;
+    let stats_update_interval_seconds = 1.0f32;
+    let mut stats_update_timer = 0.0f32;
     let mut world_update_time = Duration::ZERO;
     let mut world_render_time = Duration::ZERO;
 
@@ -92,14 +93,25 @@ fn main() {
     /* --------------------------------------- */
     while !rl.window_should_close() {
         let dt = rl.get_frame_time();
-        stats_update_interval -= dt;
-
-        let world_update_start_t = Instant::now();
+        stats_update_timer -= dt;
 
         if !is_paused {
-            world.update(dt, &mut rng);
-            if stats_update_interval <= 0.0 {
-                world_update_time = world_update_start_t.elapsed();
+            if is_fast_forwarding {
+                let steps = 5;
+                let stable_dt = 0.01666667;
+                for _ in 0..steps {
+                    let start_t = Instant::now();
+                    world.update(stable_dt, &mut rng);
+                    if stats_update_timer <= 0.0 {
+                        world_update_time = start_t.elapsed();
+                    }
+                }
+            } else {
+                let world_update_start_t = Instant::now();
+                world.update(dt, &mut rng);
+                if stats_update_timer <= 0.0 {
+                    world_update_time = world_update_start_t.elapsed();
+                }
             }
         }
 
@@ -109,7 +121,7 @@ fn main() {
                 &mut renderer,
                 &mut is_paused,
                 &mut is_pheromone_mode,
-                &mut fast_forward_multiplier,
+                &mut is_fast_forwarding,
             );
             handle_mouse_wheel(&mut rl, &mut camera, &mut renderer);
             handle_mouse_click(
@@ -126,7 +138,7 @@ fn main() {
         d.clear_background(BACKGROUND_COLOR);
 
         d.draw_text(
-            &format!("{} fps", d.get_fps()),
+            &format!("FPS: {}", d.get_fps()),
             WORLD_WIDTH - 20,
             10,
             20,
@@ -154,7 +166,7 @@ fn main() {
             renderer.draw_world(&mut world, &mut mode2d);
         }
 
-        if stats_update_interval <= 0.0 {
+        if stats_update_timer <= 0.0 {
             world_render_time = render_time_start.elapsed();
         }
 
@@ -179,18 +191,12 @@ fn main() {
         if is_pheromone_mode {
             d.draw_text("PHEROMONE MODE ON", 10, 10, 20, Color::WHITE);
         }
-        if fast_forward_multiplier > 1.0 {
-            d.draw_text(
-                &format!(">> x{fast_forward_multiplier}"),
-                10,
-                30,
-                10,
-                Color::WHITE,
-            );
+        if is_fast_forwarding {
+            d.draw_text(">> x5 >>", 10, 30, 10, Color::WHITE);
         }
 
-        if stats_update_interval <= 0.0 {
-            stats_update_interval = 1.0;
+        if stats_update_timer <= 0.0 {
+            stats_update_timer = stats_update_interval_seconds;
         }
     }
 }
@@ -204,7 +210,7 @@ fn handle_key_press(
     renderer: &mut Renderer,
     is_paused: &mut bool,
     is_pheromone_mode: &mut bool,
-    fast_forward: &mut f32,
+    is_fast_forwarding: &mut bool,
 ) {
     if *is_pheromone_mode {
         if rl.is_key_pressed(KeyboardKey::KEY_P) {
@@ -217,12 +223,7 @@ fn handle_key_press(
             renderer.toggle_show_pheromones("ALL");
         }
     } else if rl.is_key_pressed(KeyboardKey::KEY_F) {
-        *fast_forward += 1.0;
-        if *fast_forward == 6.0 {
-            *fast_forward = 10.0;
-        } else if *fast_forward >= 10.0 {
-            *fast_forward = 1.0;
-        }
+        *is_fast_forwarding = !*is_fast_forwarding;
     } else if rl.is_key_pressed(KeyboardKey::KEY_A) {
         renderer.toggle_show_ants();
     } else if rl.is_key_pressed(KeyboardKey::KEY_P) {

@@ -81,9 +81,8 @@ impl Navigation {
     pub fn seek(&mut self, target: Vector2, delta_time: f32) -> Vector2 {
         let mut desired = target - self.position;
 
-        let d_len = desired.length();
-        if d_len > 0.0 {
-            desired *= self.max_speed / d_len;
+        if desired.length() > 0.0 {
+            desired = desired.normalize() * self.max_speed;
         }
 
         let steering_force = desired - self.velocity;
@@ -107,16 +106,15 @@ impl Navigation {
         };
 
         let turn_right_dir = Vector2::new(-forward.y, forward.x);
-        let applied_force = turn_right_dir * self.max_force * 3.0;
-        self.current_steering_force = applied_force;
-        let rotation_step = 3.0 * delta_time;
-        self.wander_angle += rotation_step;
+        self.velocity += turn_right_dir * self.max_force * 3.0 * delta_time;
 
-        if self.wander_angle > std::f32::consts::PI {
-            self.wander_angle -= 2.0 * std::f32::consts::PI;
+        if self.velocity.length() > self.max_speed {
+            self.velocity = self.velocity.normalize() * self.max_speed;
         }
 
-        self.calculate_next_position(delta_time)
+        self.wander_angle = self.velocity.y.atan2(self.velocity.x);
+        self.position += self.velocity * delta_time;
+        self.position
     }
 
     /// Directly forces a lateral banking turn to the left,
@@ -129,16 +127,15 @@ impl Navigation {
         };
 
         let turn_left_dir = Vector2::new(forward.y, -forward.x);
-        let applied_force = turn_left_dir * self.max_force * 3.0;
-        self.current_steering_force = applied_force;
-        let rotation_step = 3.0 * delta_time;
-        self.wander_angle -= rotation_step;
+        self.velocity += turn_left_dir * self.max_force * 3.0 * delta_time;
 
-        if self.wander_angle < -std::f32::consts::PI {
-            self.wander_angle += 2.0 * std::f32::consts::PI;
+        if self.velocity.length() > self.max_speed {
+            self.velocity = self.velocity.normalize() * self.max_speed;
         }
 
-        self.calculate_next_position(delta_time)
+        self.wander_angle = self.velocity.y.atan2(self.velocity.x);
+        self.position += self.velocity * delta_time;
+        self.position
     }
 
     /// Instantly flips velocity and wander vectors 180 degrees,

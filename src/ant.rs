@@ -3,8 +3,8 @@ use crate::{
     reynolds::Navigation,
     settings::{
         ANT_HARVEST_AMOUNT_RANGE, ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
-        ANT_PAUSE_FOR_RANGE_IN_SEC, ANT_PAUSE_PROBABILITY, ANT_PHEROMONE_LOSS_RATE,
-        ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE, EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE,
+        ANT_PAUSE_FOR_RANGE_IN_SEC, ANT_PAUSE_PROBABILITY, ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE,
+        EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE,
     },
 };
 use rand::{RngExt as _, rngs::SmallRng};
@@ -59,7 +59,7 @@ impl AntColony {
         let mut pcnt = ((percent_of_explorer_ants / 100.0) * len as f32).ceil();
 
         for i in 0..len {
-            let mut ant = Ant::new(self.position);
+            let mut ant = Ant::new(self.position, rng);
 
             ant.id = i as i32;
             if pcnt > 0.0 {
@@ -127,29 +127,19 @@ pub enum AntKind {
 pub struct Ant {
     pub id: i32,
     pub navigator: Navigation,
-    //pub position: Vector2,
-    //pub velocity: Vector2,
-    //pub speed: f32,
     pub state: AntState,
     pub kind: AntKind,
-    //pub steering_force: Vector2,
-    /// Amount of food we are currently carrying
     pub food: f32,
-    /// Amount of food 'this' ant has harvested.
     pub harvested_amount: f32,
-    /// Amount of time left in pause. 0.0 means we are not paused.
     pub paused: f32,
-
     pub last_position: Vector2,
     pub real_speed_cm_s: f32,
-
     pheromone_tank: f32,
     sensors: Sensors,
 }
 
 impl Ant {
-    pub fn new(position: Vector2) -> Self {
-        let mut rng = rand::rng();
+    pub fn new(position: Vector2, rng: &mut SmallRng) -> Self {
         let forward_direction = rng.random_range(0.0f32.to_radians()..360.0f32.to_radians());
         let vel = Vector2::new(forward_direction.cos(), forward_direction.sin());
 
@@ -307,35 +297,11 @@ impl Ant {
         None // They're all 0s, target pheromone was not sensed
     }
 
-    pub fn place_pheromone(&mut self, cell: &mut Cell, delta_time: f32) {
-        if self.is_out_of_pheromones() || !cell.allows_pheromones() {
-            return;
-        }
-
-        let remaining = self.pheromone_tank;
-        let strength = crate::world::World::calculate_decayed_amount(
-            remaining,
-            delta_time,
-            ANT_PHEROMONE_LOSS_RATE,
-        );
-
+    pub fn place_pheromone(&mut self, cell: &mut Cell, strength: f32) {
         match self.state {
-            AntState::Foraging => {
-                if strength < cell.to_home {
-                    return;
-                }
-                cell.to_home = strength;
-                let lost = (remaining - strength) * ANT_PHEROMONE_LOSS_RATE;
-                self.lose_pheromones(lost);
-            }
-            AntState::ReturningFood => {
-                if strength < cell.to_food {
-                    return;
-                }
-                cell.to_food = strength;
-                let lost = (remaining - strength) * ANT_PHEROMONE_LOSS_RATE;
-                self.lose_pheromones(lost);
-            }
+            AntState::Foraging if strength > cell.to_home => cell.to_home = strength,
+            AntState::ReturningFood if strength > cell.to_food => cell.to_food = strength,
+            _ => {}
         };
     }
 
@@ -349,18 +315,7 @@ impl Ant {
         self.last_position = self.navigator.position;
     }
 
-    pub fn try_harvest_food(&mut self, current_cell: &mut Cell, rng: &mut SmallRng) {
-        if !self.is_foraging() || !current_cell.has_food() {
-            return;
-        }
-        let harvested_amount = self.harvest(current_cell.food, rng);
-        current_cell.food = (current_cell.food - harvested_amount).max(0.0);
-        self.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
-    }
-
-    // Gets a random number from ANT_HARVEST_AMOUNT_RANGE and takes it from
-    // capacity_to_harvest_from, then returns amount harvested
-    fn harvest(&mut self, capacity_to_harvest_from: f32, rng: &mut SmallRng) -> f32 {
+    pub fn harvest(&mut self, capacity_to_harvest_from: f32, rng: &mut SmallRng) -> f32 {
         let amount = rng
             .random_range(ANT_HARVEST_AMOUNT_RANGE)
             .min(capacity_to_harvest_from);
@@ -368,7 +323,7 @@ impl Ant {
     }
 
     // Attempts to harvest the exact amount provided. Returns amount harvested.
-    fn harvest_amount(&mut self, amount: f32) -> f32 {
+    pub fn harvest_amount(&mut self, amount: f32) -> f32 {
         if amount <= 0.0 {
             return 0.0;
         }
@@ -378,20 +333,12 @@ impl Ant {
     }
 
     // Returns amount delivered..
-    pub fn deliver_food(&mut self, colony_center: &Vector2) -> Option<f32> {
-        if !self.is_returning_food() {
-            return None;
-        }
-        // If ant is at colony center
-        if self.navigator.position.distance_sqr(*colony_center) <= 0.1 {
-            let delivered = self.food;
-            self.harvested_amount += delivered;
-            self.food = 0.0;
-            self.state = AntState::Foraging;
-            self.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
-            return Some(delivered);
-        }
-        None
+    pub fn deliver_food(&mut self) -> f32 {
+        let delivered = self.food;
+        self.harvested_amount += delivered;
+        self.food = 0.0;
+        self.state = AntState::Foraging;
+        delivered
     }
 
     pub fn handle_pause(&mut self, decrease_pause_time_by: f32, rng: &mut SmallRng) {
@@ -431,6 +378,7 @@ impl Ant {
 
         *start = 0.0;
         *stop = rng.random_range(5.0..10.0);
+        self.pheromone_tank += 1.0;
 
         _ = self.navigator.wander(delta_time, rng);
 

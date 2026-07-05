@@ -1,7 +1,7 @@
 use crate::{
     ant::AntColony,
     map::{Grid, Terrain},
-    settings::PHEROMONE_DECAY_RATE,
+    settings::{ANT_MAX_PHEROMONE_CAPACITY, ANT_PHEROMONE_LOSS_RATE, PHEROMONE_DECAY_RATE},
 };
 use rand::rngs::SmallRng;
 
@@ -34,20 +34,46 @@ impl World {
             }
 
             let current_cell = ant.sense_environment(&mut self.grid);
+            let is_exploring = ant.explore(delta_time, rng);
 
-            if !ant.explore(delta_time, rng) {
+            if !is_exploring {
+                // Gather food
+                if ant.is_foraging() && current_cell.has_food() {
+                    let harvested_amount = ant.harvest(current_cell.food, rng);
+                    current_cell.food = (current_cell.food - harvested_amount).max(0.0);
+                    ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
+                    //ant.turn_in_any_direction();
+                    //ant.navigator
+                    //    .turn_around(ANT_OBSTACLE_PANIC_ANGLE_MIN..ANT_OBSTACLE_PANIC_ANGLE_MAX);
+                    continue;
+                }
+                // Deliver food to colony
                 if ant.is_returning_food() && current_cell.is_colony() {
-                    if let Some(delivered) = ant.deliver_food(&colony_center) {
-                        self.colony.harvested_food += delivered;
-                    } else if current_cell.is_colony() {
+                    // If ant is at colony center
+                    if ant.navigator.position.distance_sqr(colony_center) <= 0.1 {
+                        self.colony.harvested_food += ant.deliver_food();
+                        ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
+                        //ant.turn_in_any_direction();
+                        //ant.navigator.turn_around(
+                        //    ANT_OBSTACLE_PANIC_ANGLE_MIN..ANT_OBSTACLE_PANIC_ANGLE_MAX,
+                        //);
+                    } else {
                         _ = ant.navigator.seek(colony_center, delta_time);
+                        //ant.steer_towards_position(colony_center, delta_time);
                     }
-                } else if ant.is_foraging() && current_cell.has_food() {
-                    ant.try_harvest_food(current_cell, rng);
+                    continue;
                 }
             }
 
-            ant.place_pheromone(current_cell, delta_time);
+            if !ant.is_out_of_pheromones() && current_cell.allows_pheromones() {
+                let loss_rate = ANT_PHEROMONE_LOSS_RATE;
+                let remaining = ant.get_pheromones_remaining();
+                let strength = World::calculate_decayed_amount(remaining, delta_time, loss_rate);
+                let lost = (remaining - strength) * loss_rate;
+                ant.place_pheromone(current_cell, strength);
+                ant.lose_pheromones(lost);
+            }
+
             ant.update_speed(delta_time);
             ant.calculate_next_position(delta_time, rng);
         }
