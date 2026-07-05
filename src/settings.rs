@@ -8,7 +8,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 12_000;
+pub const NUM_ANTS: usize = 1_000;
 pub const PERCENT_OF_EXPLORER_ANTS: f32 = 0.0;
 // When an explorer ants time to explore runs out, it goes exploring.
 // We pick a random number in this range so not all ants go exploring at the same time.
@@ -26,7 +26,7 @@ pub const ANT_MAX_PHEROMONE_CAPACITY: f32 = 200.0;
 pub const ANT_MAX_TURN_FORCE: f32 = 15.0;
 pub const ANT_TURN_ANGLE: f32 = 30.0;
 
-pub const ANT_PROJECTION_CIRCLE_RADIUS: f32 = 20.0; // 20.0 seems stable
+pub const ANT_PROJECTION_CIRCLE_RADIUS: f32 = 10.0; // 20.0 seems stable
 pub const ANT_PROJECTION_CIRCLE_DISTANCE: f32 = 20.0; // 50.0 was OG value
 
 pub const ANT_SPEED_WOBBLE_PERCENT: f32 = 50.0; // Should be btwn 0.1 and 100.0

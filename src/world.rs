@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use crate::{
     ant::AntColony,
     map::{Grid, Terrain},
@@ -41,13 +43,13 @@ impl World {
             let current_cell = ant.sense_environment(&mut self.grid);
 
             if !ant.explore(delta_time, rng) {
-                if ant.is_returning_food() {
+                if ant.is_returning_food() && current_cell.is_colony() {
                     if let Some(delivered) = ant.deliver_food(&colony_center) {
                         self.colony.harvested_food += delivered;
                     } else if current_cell.is_colony() {
                         _ = ant.navigator.seek(colony_center, delta_time);
                     }
-                } else {
+                } else if ant.is_foraging() && current_cell.has_food() {
                     ant.try_harvest_food(current_cell, rng);
                 }
             }

@@ -204,12 +204,12 @@ impl Renderer {
         let w_edge_point = self.viewport.grid_to_world(edge_grid_point);
         let w_circle_radius = (w_edge_point - w_circle_center).length();
         // Draw the perfect hollow border
-        //d.draw_circle_lines_v(w_circle_center, w_circle_radius, Color::GRAY);
+        d.draw_circle_lines_v(w_circle_center, w_circle_radius, Color::GRAY);
         // Draw the guiding lines
         d.draw_line_v(w_ant_center, w_circle_center, Color::LIGHTGRAY);
         d.draw_line_v(w_circle_center, w_target_dot, Color::DARKGRAY);
         // Draw the solid target point right on the outline
-        //d.draw_circle_v(w_target_dot, 2.0, Color::DARKGRAY);
+        d.draw_circle_v(w_target_dot, 2.0, Color::DARKGRAY);
     }
 
     pub fn draw_grid(&mut self, grid: &mut Grid, d: &mut impl RaylibDraw) {

@@ -13,6 +13,8 @@ pub struct Navigation {
     pub current_steering_force: Vector2,
     pub wander_circle: Vector2,
     pub wander_circle_displacement: Vector2,
+
+    forward: Vector2,
 }
 
 impl Navigation {
@@ -29,6 +31,7 @@ impl Navigation {
             wander_angle,
             max_speed,
             max_force,
+            forward: Vector2::ZERO,
             wander_circle: Vector2::default(),
             wander_circle_displacement: Vector2::default(),
             current_steering_force: Vector2::default(),
@@ -45,9 +48,8 @@ impl Navigation {
     pub fn wander(&mut self, delta_time: f32, rng: &mut SmallRng) -> Vector2 {
         let circle_radius = ANT_PROJECTION_CIRCLE_RADIUS;
         let circle_distance = ANT_PROJECTION_CIRCLE_DISTANCE;
-        let change = 4.0;
+        let change = 8.0;
 
-        // Safely scale the random angle change by delta_time for stable fast-forwarding
         let random_offset = rng.random_range::<f32, _>(-1.0..=1.0);
         self.wander_angle += random_offset * change * delta_time;
 
@@ -74,7 +76,6 @@ impl Navigation {
             wander_force
         };
 
-        // Advance physics internally and return position
         self.calculate_next_position(delta_time)
     }
 
@@ -96,7 +97,6 @@ impl Navigation {
             steering_force
         };
 
-        // Advance physics internally and return position
         self.calculate_next_position(delta_time)
     }
 
@@ -108,22 +108,17 @@ impl Navigation {
         } else {
             Vector2::new(1.0, 0.0)
         };
-        let turn_right_dir = Vector2::new(-forward.y, forward.x);
 
-        // Generate and assign the hard side-steering force
+        let turn_right_dir = Vector2::new(-forward.y, forward.x);
         let applied_force = turn_right_dir * self.max_force * 3.0;
         self.current_steering_force = applied_force;
-
-        // Turn the wander target circle angle proportionally with the turn
         let rotation_step = 3.0 * delta_time;
         self.wander_angle += rotation_step;
 
-        // Bound angle between -PI and PI
         if self.wander_angle > std::f32::consts::PI {
             self.wander_angle -= 2.0 * std::f32::consts::PI;
         }
 
-        // Advance physics internally and return position
         self.calculate_next_position(delta_time)
     }
 
@@ -136,23 +131,16 @@ impl Navigation {
             Vector2::new(1.0, 0.0)
         };
 
-        // Derive a 90-degree vector pointing LEFT (Inverted right axis)
         let turn_left_dir = Vector2::new(forward.y, -forward.x);
-
-        // Generate and assign the hard side-steering force
         let applied_force = turn_left_dir * self.max_force * 3.0;
         self.current_steering_force = applied_force;
-
-        // Turn the wander target circle angle counter-clockwise (subtracting instead of adding)
         let rotation_step = 3.0 * delta_time;
         self.wander_angle -= rotation_step;
 
-        // Bound angle between -PI and PI to prevent float overflow
         if self.wander_angle < -std::f32::consts::PI {
             self.wander_angle += 2.0 * std::f32::consts::PI;
         }
 
-        // Advance physics internally and return position
         self.calculate_next_position(delta_time)
     }
 
@@ -164,27 +152,18 @@ impl Navigation {
         delta_time: f32,
         rng: &mut SmallRng,
     ) -> Vector2 {
-        // 1. Flip and rotate velocity exactly like your original panic-angle code
         self.velocity *= -1.0;
         let panic_angle = rng.random_range(panic_angle).to_radians();
         self.velocity = self.velocity.rotate(panic_angle);
-
-        // 2. Mirror and rotate the wander angle so the wander target circle
-        // stays directly in front of the ant's new heading direction
         self.wander_angle += std::f32::consts::PI + panic_angle;
 
-        // 3. Keep the angle wrapped between -PI and PI to prevent overflow
         if self.wander_angle > std::f32::consts::PI {
             self.wander_angle -= 2.0 * std::f32::consts::PI;
         } else if self.wander_angle < -std::f32::consts::PI {
             self.wander_angle += 2.0 * std::f32::consts::PI;
         }
 
-        // 4. CRITICAL CHOICE B SYNC: For exactly this frame, zero out current steering force
-        // so wander math doesn't snap it backward during the next sub-step.
         self.current_steering_force = Vector2::zero();
-
-        // 5. Explicitly apply the flipped velocity to update and return position
         self.position += self.velocity * delta_time;
         self.position
     }

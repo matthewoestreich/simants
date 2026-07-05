@@ -83,19 +83,26 @@ fn main() {
     let mut click_start_pos = Vector2::zero();
     let mut fast_forward_multiplier = 1.0; // 1 is normal speed
 
+    let mut stats_update_interval = 0.0f32;
+    let mut world_update_time = Duration::ZERO;
+    let mut world_render_time = Duration::ZERO;
+
     /* --------------------------------------- */
     /* ------------ Game Loop ---------------- */
     /* --------------------------------------- */
     while !rl.window_should_close() {
-        let update_start = Instant::now();
-        let mut update_time = Duration::default();
+        let dt = rl.get_frame_time();
+        stats_update_interval -= dt;
+
+        let world_update_start_t = Instant::now();
+
         if !is_paused {
-            let dt = rl.get_frame_time();
             world.update(dt, &mut rng);
-            update_time = update_start.elapsed();
+            if stats_update_interval <= 0.0 {
+                world_update_time = world_update_start_t.elapsed();
+            }
         }
 
-        /*
         if renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
             handle_key_press(
                 &mut rl,
@@ -114,28 +121,28 @@ fn main() {
                 &mut click_start_pos,
             );
         }
-        */
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
 
-        let fps = d.get_fps();
         d.draw_text(
-            &format!("{fps} fps"),
+            &format!("{} fps", d.get_fps()),
             WORLD_WIDTH - 20,
             10,
             20,
             Color::WHITE,
         );
+
         d.draw_text(
-            &format!("Update: {update_time:?}"),
+            &format!("Update: {world_update_time:?}"),
             WORLD_WIDTH - 20,
             50,
-            10,
+            20,
             Color::WHITE,
         );
 
-        let now = Instant::now();
+        let render_time_start = Instant::now();
+
         {
             let mut scissor = d.begin_scissor_mode(
                 renderer.viewport.x,
@@ -144,15 +151,19 @@ fn main() {
                 renderer.viewport.height,
             );
             let mut mode2d = scissor.begin_mode2D(camera);
-
             renderer.draw_world(&mut world, &mut mode2d);
         }
-        let duration = now.elapsed();
+
+        if stats_update_interval <= 0.0 {
+            world_render_time = render_time_start.elapsed();
+        }
+
+        // Draw render time stats
         d.draw_text(
-            &format!("Render: {duration:?}"),
+            &format!("Render: {world_render_time:?}"),
             WORLD_WIDTH - 20,
             30,
-            10,
+            20,
             Color::WHITE,
         );
 
@@ -176,6 +187,10 @@ fn main() {
                 10,
                 Color::WHITE,
             );
+        }
+
+        if stats_update_interval <= 0.0 {
+            stats_update_interval = 1.0;
         }
     }
 }

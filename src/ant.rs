@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::{
     map::{Cell, CellSample, Grid, Terrain},
     reynolds::Navigation,
@@ -184,7 +186,6 @@ impl Ant {
 
         let left_dir = center_dir.rotate(-ANT_SENSOR_ANGLE.to_radians());
         let right_dir = center_dir.rotate(ANT_SENSOR_ANGLE.to_radians());
-
         let sensor_distance = ANT_SENSOR_DISTANCE as f32;
         let left_loc = self.navigator.position + (left_dir * sensor_distance);
         let center_loc = self.navigator.position + (center_dir * sensor_distance);
@@ -203,14 +204,11 @@ impl Ant {
             reading: grid.sample_position_with_pheromone_bias(right_loc, self.state),
         };
 
-        #[allow(clippy::expect_fun_call)]
         grid.get_cell_mut(
             self.navigator.position.x as u32,
             self.navigator.position.y as u32,
         )
-        .expect(&format!(
-            "current position to always be valid, ant: {self:?}"
-        ))
+        .expect("bad position")
     }
 
     pub fn calculate_next_position(&mut self, delta_time: f32, rng: &mut SmallRng) -> Vector2 {
@@ -226,7 +224,7 @@ impl Ant {
             && let Some(pos) = self.sense_terrain(Terrain::Colony)
         {
             self.navigator.seek(pos, delta_time)
-        } else if let Some(pos) = self.steer_towards_pheromone() {
+        } else if let Some(pos) = self.steer_towards_pheromone(rng) {
             self.navigator.seek(pos, delta_time)
         } else {
             self.navigator.wander(delta_time, rng)
@@ -284,7 +282,7 @@ impl Ant {
 
     /// Steers towards strongest target pheromone. If the strongest value is still 0.0,
     /// it means we did not sense the target pheromone, so we return None
-    fn steer_towards_pheromone(&self) -> Option<Vector2> {
+    fn steer_towards_pheromone(&self, rng: &mut SmallRng) -> Option<Vector2> {
         let left = self.sensors.left.reading.target_pheromone;
         let center = self.sensors.center.reading.target_pheromone;
         let right = self.sensors.right.reading.target_pheromone;
@@ -302,7 +300,7 @@ impl Ant {
         // If left and right are equal, and at least one of them is > 0.0 (implicitly making both
         // of them > 0.0), randomly pick one.
         if left > 0.0 && left == right {
-            if rand::random() {
+            if rng.random() {
                 return self.sensors.left.location;
             }
             return self.sensors.right.location;
