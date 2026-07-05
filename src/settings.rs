@@ -18,7 +18,7 @@ pub const ANT_MAX_SPEED: f32 = 2.5; // (2.5 seems stable) cm/s with bursts that 
 pub const ANT_SPEED_WOBBLE_PERCENT: f32 = 50.0; // Should be btwn 0.1 and 100.0
 pub const ANT_ACCELERATION_RATE: f32 = 5.0; // 5.0 seems stable
 pub const ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT: f32 = 0.70; // If this value is 0.70, it will slow the ant down 30%
-pub const ANT_MAX_PHEROMONE_CAPACITY: f32 = 200.0;
+pub const ANT_MAX_PHEROMONE_CAPACITY: f32 = 300.0;
 pub const ANT_HARVEST_AMOUNT_RANGE: Range<f32> = 10.0..50.0;
 pub const ANT_MAX_TURN_FORCE: f32 = 15.0;
 pub const ANT_TURN_ANGLE: f32 = 30.0;
@@ -72,8 +72,8 @@ pub const TITLE: &str = "Ant Simulation";
 pub const WINDOW_WIDTH: i32 = 1200;
 pub const WINDOW_HEIGHT: i32 = 800;
 
-pub const WORLD_WIDTH: i32 = 1000;
-pub const WORLD_HEIGHT: i32 = 600;
+pub const WORLD_WIDTH: i32 = 1200;
+pub const WORLD_HEIGHT: i32 = 800;
 
 pub const GRID_COLS: u32 = 300; //300;
 pub const GRID_ROWS: u32 = 200; //200;
