@@ -42,6 +42,8 @@ fn main() {
         GRID_ROWS,
     );
 
+    println!("{GRID_COLS} x {GRID_ROWS}");
+
     let mut rng: SmallRng = rand::make_rng();
 
     let mut renderer = Renderer::new(viewport);
@@ -83,10 +85,12 @@ fn main() {
     let mut click_start_pos = Vector2::zero();
     let mut is_fast_forwarding = false;
 
-    let stats_update_interval_seconds = 1.0f32;
+    let stats_update_interval_seconds = 0.5f32; // 1.0 = 1second
     let mut stats_update_timer = 0.0f32;
     let mut world_update_time = Duration::ZERO;
     let mut world_render_time = Duration::ZERO;
+
+    let mut simulation_time = 0.0;
 
     /* --------------------------------------- */
     /* ------------ Game Loop ---------------- */
@@ -122,6 +126,15 @@ fn main() {
                 let steps = 5;
                 let stable_dt = 0.01666667;
                 for _ in 0..steps {
+                    simulation_time += stable_dt;
+                    let t = calc_game_time(simulation_time);
+                    d.draw_text(
+                        &format!("Time: {}:{}:{}", t.0, t.1, t.2),
+                        WORLD_WIDTH / 2,
+                        10,
+                        20,
+                        Color::WHITE,
+                    );
                     let start_t = Instant::now();
                     world.update(stable_dt, &mut rng);
                     if stats_update_timer <= 0.0 {
@@ -129,6 +142,7 @@ fn main() {
                     }
                 }
             } else {
+                simulation_time += dt;
                 let world_update_start_t = Instant::now();
                 world.update(*dt, &mut rng);
                 if stats_update_timer <= 0.0 {
@@ -137,16 +151,22 @@ fn main() {
             }
         }
 
-        if !is_fast_forwarding {
-            d.draw_text(
-                &format!("FPS: {}", d.get_fps()),
-                WORLD_WIDTH - 20,
-                10,
-                20,
-                Color::WHITE,
-            );
-        }
+        let t = calc_game_time(simulation_time);
+        d.draw_text(
+            &format!("Time: {}:{}:{}", t.0, t.1, t.2),
+            WORLD_WIDTH / 2,
+            10,
+            20,
+            Color::WHITE,
+        );
 
+        d.draw_text(
+            &format!("FPS: {}", d.get_fps()),
+            WORLD_WIDTH - 20,
+            10,
+            20,
+            Color::WHITE,
+        );
         d.draw_text(
             &format!("Update: {world_update_time:?}"),
             WORLD_WIDTH - 20,
@@ -214,6 +234,15 @@ fn main() {
 /* ---------------------------------------------------------------- */
 /* -------------- Helper Functions -------------------------------- */
 /* ---------------------------------------------------------------- */
+
+// Returns tuple of (i32, i32, i32) representng (hours, min, sec)
+fn calc_game_time(simulation_time: f32) -> (i32, i32, i32) {
+    let total_seconds = simulation_time as i32;
+    let hours = total_seconds / 3600;
+    let minutes = (total_seconds / 60) % 60;
+    let seconds = total_seconds % 60;
+    (hours, minutes, seconds)
+}
 
 fn handle_key_press(
     rl: &mut RaylibHandle,
@@ -338,7 +367,7 @@ fn handle_mouse_click(
                 .colony
                 .ants
                 .iter()
-                .find(|ant| ant.is_clicked(click_grid_position, 3.0f32))
+                .find(|ant| ant.is_clicked(click_grid_position, 1.0f32))
             {
                 println!("{ant}");
             }

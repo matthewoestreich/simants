@@ -132,7 +132,8 @@ pub struct Ant {
     pub food: f32,
     pub harvested_amount: f32,
     pub paused: f32,
-    pub last_position: Vector2,
+    pub previous_position: Vector2,
+    pub total_distance_traveled_cm: f32,
     pub real_speed_cm_s: f32,
     pheromone_tank: f32,
     sensors: Sensors,
@@ -306,13 +307,17 @@ impl Ant {
     }
 
     pub fn update_speed(&mut self, delta_time: f32) {
-        let distance_traveled_cm = self.navigator.position.distance(self.last_position);
+        let distance_traveled_cm = self.navigator.position.distance(self.previous_position);
         if delta_time > 0.0 {
             self.real_speed_cm_s = distance_traveled_cm / delta_time;
         } else {
             self.real_speed_cm_s = 0.0;
         }
-        self.last_position = self.navigator.position;
+    }
+
+    pub fn update_distance_traveled(&mut self) {
+        let frame_distance = self.navigator.position.distance(self.previous_position);
+        self.total_distance_traveled_cm += frame_distance;
     }
 
     pub fn harvest(&mut self, capacity_to_harvest_from: f32, rng: &mut SmallRng) -> f32 {
@@ -393,7 +398,10 @@ impl Ant {
         self.pheromone_tank
     }
 
-    pub fn lose_pheromones(&mut self, value: f32) {
+    pub fn lose_pheromones(&mut self, mut value: f32) {
+        if value < 0.1 {
+            value = 0.0;
+        }
         self.pheromone_tank = (self.pheromone_tank - value).max(0.0);
     }
 
@@ -464,6 +472,12 @@ impl std::fmt::Display for Ant {
             "  speed: {{ units: {}, cm/s: {} }}",
             self.navigator.current_speed(),
             self.real_speed_cm_s
+        )?;
+
+        writeln!(
+            f,
+            "  distance_traveled: {}cm",
+            self.total_distance_traveled_cm
         )?;
 
         writeln!(f, "  pheromone_tank: {}", self.pheromone_tank)?;

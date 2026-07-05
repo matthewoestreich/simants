@@ -69,13 +69,19 @@ impl World {
                 let loss_rate = ANT_PHEROMONE_LOSS_RATE;
                 let remaining = ant.get_pheromones_remaining();
                 let strength = World::calculate_decayed_amount(remaining, delta_time, loss_rate);
-                let lost = (remaining - strength) * loss_rate;
+                let lost = remaining - strength; // * loss_rate;
+                //println!(
+                //    "placing pheromone : loss_rate= {loss_rate} | ant_{}_remaining= {remaining} | drop_strength= {strength} | lost= {lost}",
+                //    ant.id
+                //);
                 ant.place_pheromone(current_cell, strength);
                 ant.lose_pheromones(lost);
             }
 
-            ant.update_speed(delta_time);
+            ant.previous_position = ant.navigator.position;
             ant.calculate_next_position(delta_time, rng);
+            ant.update_speed(delta_time);
+            ant.update_distance_traveled();
         }
     }
 
