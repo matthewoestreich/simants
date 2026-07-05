@@ -3,8 +3,8 @@ use crate::{
     reynolds::Navigation,
     settings::{
         ANT_HARVEST_AMOUNT_RANGE, ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
-        ANT_PAUSE_FOR_RANGE_IN_SEC, ANT_PAUSE_PROBABILITY, ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE,
-        EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE,
+        ANT_PAUSE_FOR_RANGE_IN_SEC, ANT_PAUSE_PROBABILITY, ANT_PHEROMONE_GAIN_WHILE_PAUSED,
+        ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE, EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE,
     },
 };
 use rand::{RngExt as _, rngs::SmallRng};
@@ -343,7 +343,7 @@ impl Ant {
 
     pub fn handle_pause(&mut self, decrease_pause_time_by: f32, rng: &mut SmallRng) {
         if self.paused > 0.0 {
-            self.pheromone_tank += 0.001;
+            self.pheromone_tank += ANT_PHEROMONE_GAIN_WHILE_PAUSED;
             self.paused = (self.paused - decrease_pause_time_by).max(0.0);
         } else if self.should_pause(ANT_PAUSE_PROBABILITY, rng) {
             self.paused = rng.random_range(ANT_PAUSE_FOR_RANGE_IN_SEC);
@@ -465,6 +465,7 @@ impl std::fmt::Display for Ant {
             self.navigator.current_speed(),
             self.real_speed_cm_s
         )?;
+
         writeln!(f, "  pheromone_tank: {}", self.pheromone_tank)?;
         writeln!(
             f,

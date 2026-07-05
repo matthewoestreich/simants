@@ -92,32 +92,9 @@ fn main() {
     /* ------------ Game Loop ---------------- */
     /* --------------------------------------- */
     while !rl.window_should_close() {
-        let dt = rl.get_frame_time();
-        stats_update_timer -= dt;
-
-        if !is_paused {
-            if is_fast_forwarding {
-                let steps = 5;
-                let stable_dt = 0.01666667;
-                for _ in 0..steps {
-                    let start_t = Instant::now();
-                    world.update(stable_dt, &mut rng);
-                    if stats_update_timer <= 0.0 {
-                        world_update_time = start_t.elapsed();
-                    }
-                }
-            } else {
-                let world_update_start_t = Instant::now();
-                world.update(dt, &mut rng);
-                if stats_update_timer <= 0.0 {
-                    world_update_time = world_update_start_t.elapsed();
-                }
-            }
-        }
-
         if renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
             handle_key_press(
-                &mut rl,
+                &mut rl, // <<<<<<<
                 &mut renderer,
                 &mut is_paused,
                 &mut is_pheromone_mode,
@@ -134,16 +111,41 @@ fn main() {
             );
         }
 
+        let dt = &rl.get_frame_time();
+        stats_update_timer -= dt;
+
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
 
-        d.draw_text(
-            &format!("FPS: {}", d.get_fps()),
-            WORLD_WIDTH - 20,
-            10,
-            20,
-            Color::WHITE,
-        );
+        if !is_paused {
+            if is_fast_forwarding {
+                let steps = 5;
+                let stable_dt = 0.01666667;
+                for _ in 0..steps {
+                    let start_t = Instant::now();
+                    world.update(stable_dt, &mut rng);
+                    if stats_update_timer <= 0.0 {
+                        world_update_time = start_t.elapsed();
+                    }
+                }
+            } else {
+                let world_update_start_t = Instant::now();
+                world.update(*dt, &mut rng);
+                if stats_update_timer <= 0.0 {
+                    world_update_time = world_update_start_t.elapsed();
+                }
+            }
+        }
+
+        if !is_fast_forwarding {
+            d.draw_text(
+                &format!("FPS: {}", d.get_fps()),
+                WORLD_WIDTH - 20,
+                10,
+                20,
+                Color::WHITE,
+            );
+        }
 
         d.draw_text(
             &format!("Update: {world_update_time:?}"),
@@ -175,6 +177,14 @@ fn main() {
             &format!("Render: {world_render_time:?}"),
             WORLD_WIDTH - 20,
             30,
+            20,
+            Color::WHITE,
+        );
+        // Draw num ants
+        d.draw_text(
+            &format!("Ants: {NUM_ANTS}"),
+            WORLD_WIDTH - 20,
+            70,
             20,
             Color::WHITE,
         );
