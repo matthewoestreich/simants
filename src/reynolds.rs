@@ -13,8 +13,6 @@ pub struct Navigation {
     pub current_steering_force: Vector2,
     pub wander_circle: Vector2,
     pub wander_circle_displacement: Vector2,
-
-    forward: Vector2,
 }
 
 impl Navigation {
@@ -31,7 +29,6 @@ impl Navigation {
             wander_angle,
             max_speed,
             max_force,
-            forward: Vector2::ZERO,
             wander_circle: Vector2::default(),
             wander_circle_displacement: Vector2::default(),
             current_steering_force: Vector2::default(),

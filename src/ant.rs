@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use crate::{
     map::{Cell, CellSample, Grid, Terrain},
     reynolds::Navigation,

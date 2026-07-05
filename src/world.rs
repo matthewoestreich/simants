@@ -1,5 +1,3 @@
-use std::time::{Duration, Instant};
-
 use crate::{
     ant::AntColony,
     map::{Grid, Terrain},
@@ -10,16 +8,11 @@ use rand::rngs::SmallRng;
 pub struct World {
     pub colony: AntColony,
     pub grid: Grid,
-    pub rng: rand::rngs::ThreadRng,
 }
 
 impl World {
     pub fn new(grid: Grid, colony: AntColony) -> Self {
-        Self {
-            grid,
-            colony,
-            rng: rand::rng(),
-        }
+        Self { grid, colony }
     }
 
     pub fn update(&mut self, delta_time: f32, rng: &mut SmallRng) {
