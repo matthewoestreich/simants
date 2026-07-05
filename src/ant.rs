@@ -2,10 +2,8 @@ use crate::{
     map::{Cell, CellSample, Grid, Terrain},
     reynolds::Navigation,
     settings::{
-        ANT_ACCELERATION_RATE, ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT, ANT_HARVEST_AMOUNT_RANGE,
-        ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
-        ANT_OBSTACLE_PANIC_ANGLE_MAX, ANT_OBSTACLE_PANIC_ANGLE_MIN, ANT_PAUSE_FOR_RANGE_IN_SEC,
-        ANT_PAUSE_PROBABILITY, ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE, ANT_SPEED_WOBBLE_PERCENT,
+        ANT_HARVEST_AMOUNT_RANGE, ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
+        ANT_PAUSE_FOR_RANGE_IN_SEC, ANT_PAUSE_PROBABILITY, ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE,
         ANT_TURN_ANGLE, EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE,
     },
 };
@@ -161,7 +159,7 @@ impl Ant {
             navigator: Navigation::new(
                 position,
                 vel,
-                ANT_TURN_ANGLE,
+                forward_direction, //ANT_TURN_ANGLE,
                 ANT_MAX_SPEED,
                 ANT_MAX_TURN_FORCE,
             ),
@@ -238,7 +236,7 @@ impl Ant {
 
     fn avoid_obstruction(&mut self, delta_time: f32) -> Option<Vector2> {
         if self.sensors.center.reading.terrain.is_obstruction() {
-            Some(self.navigator.turn_around(0.0..30.0))
+            Some(self.navigator.turn_around(0.0..30.0, delta_time))
         } else if self.sensors.left.reading.terrain.is_obstruction()
             && let Some(_obs) = self.sensors.left.location
         {

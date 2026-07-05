@@ -159,7 +159,7 @@ impl Renderer {
 
         d.draw_triangle(spear, left_back, right_back, ant_color);
 
-        // self.draw_ant_projection_circle(ant, d);
+        //self.draw_ant_projection_circle(ant, d);
 
         if matches!(ant.kind, AntKind::Explorer { .. }) {
             d.draw_triangle_lines(spear, left_back, right_back, Color::YELLOW);
@@ -203,12 +203,12 @@ impl Renderer {
         let w_edge_point = self.viewport.grid_to_world(edge_grid_point);
         let w_circle_radius = (w_edge_point - w_circle_center).length();
         // Draw the perfect hollow border
-        d.draw_circle_lines_v(w_circle_center, w_circle_radius, Color::GRAY);
+        //d.draw_circle_lines_v(w_circle_center, w_circle_radius, Color::GRAY);
         // Draw the guiding lines
         d.draw_line_v(w_ant_center, w_circle_center, Color::LIGHTGRAY);
         d.draw_line_v(w_circle_center, w_target_dot, Color::DARKGRAY);
         // Draw the solid target point right on the outline
-        d.draw_circle_v(w_target_dot, 2.0, Color::DARKGRAY);
+        //d.draw_circle_v(w_target_dot, 2.0, Color::DARKGRAY);
     }
 
     pub fn draw_grid(&mut self, grid: &mut Grid, d: &mut impl RaylibDraw) {
@@ -240,24 +240,24 @@ impl Renderer {
             );
 
             if self.show_to_home_pheromones && cell.to_home > 0.0 {
-                let brightness = ((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 0.8;
+                let brightness = ((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 1.0;
                 let color = PHEROMONE_FORAGING_COLOR.brightness(brightness);
                 d.draw_rectangle(
                     draw.x as i32,
                     draw.y as i32,
                     self.viewport.cell_size.x as i32 + 1,
-                    self.viewport.cell_size.y as i32,
+                    self.viewport.cell_size.y as i32 + 1,
                     color,
                 );
             }
             if self.show_to_food_pheromones && cell.to_food > 0.0 {
-                let brightness = ((cell.to_food / MAX_RGBA_VALUE) * 2.0) - 0.8;
+                let brightness = ((cell.to_food / MAX_RGBA_VALUE) * 2.0) - 1.0;
                 let color = PHEROMONE_RETURNING_FOOD_COLOR.brightness(brightness);
                 d.draw_rectangle(
                     draw.x as i32,
                     draw.y as i32,
                     self.viewport.cell_size.x as i32 + 1,
-                    self.viewport.cell_size.y as i32,
+                    self.viewport.cell_size.y as i32 + 1,
                     color,
                 );
             }
