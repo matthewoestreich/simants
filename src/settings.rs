@@ -1,3 +1,5 @@
+#![allow(unused_variables, dead_code)]
+
 use raylib::ffi::Color;
 use std::ops::Range;
 

@@ -1,10 +1,7 @@
 use crate::{
     ant::AntColony,
     map::{Grid, Terrain},
-    settings::{
-        ANT_MAX_PHEROMONE_CAPACITY, ANT_OBSTACLE_PANIC_ANGLE_MAX, ANT_OBSTACLE_PANIC_ANGLE_MIN,
-        ANT_PHEROMONE_LOSS_RATE, PHEROMONE_DECAY_RATE,
-    },
+    settings::PHEROMONE_DECAY_RATE,
 };
 
 pub struct World {
@@ -36,59 +33,20 @@ impl World {
             }
 
             let current_cell = ant.sense_environment(&mut self.grid);
-            let is_exploring = ant.explore(delta_time);
 
-            if !is_exploring {
-                // Gather food
-                if ant.is_foraging() && current_cell.is_food() {
-                    // TODO : clean this up
-                    let harvested_amount = ant.harvest(current_cell.food);
-                    current_cell.food = (current_cell.food - harvested_amount).max(0.0);
-                    ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
-                    //ant.turn_in_any_direction();
-                    //ant.navigator
-                    //    .turn_around(ANT_OBSTACLE_PANIC_ANGLE_MIN..ANT_OBSTACLE_PANIC_ANGLE_MAX);
-                    continue;
-                }
-                // Deliver food to colony
-                if ant.is_returning_food() && current_cell.is_colony() {
-                    // If ant is at colony center
-                    if ant.navigator.position.distance_sqr(colony_center) <= 0.1 {
-                        self.colony.harvested_food += ant.deliver_food();
-                        ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
-                        //ant.turn_in_any_direction();
-                        //ant.navigator.turn_around(
-                        //    ANT_OBSTACLE_PANIC_ANGLE_MIN..ANT_OBSTACLE_PANIC_ANGLE_MAX,
-                        //);
-                    } else {
-                        _ = ant.navigator.seek(colony_center, delta_time);
-                        //ant.steer_towards_position(colony_center, delta_time);
-                    }
-                    continue;
+            if !ant.explore(delta_time) {
+                if let Some(delivered) = ant.deliver_food(&colony_center) {
+                    self.colony.harvested_food += delivered;
+                } else if current_cell.is_colony() {
+                    _ = ant.navigator.seek(colony_center, delta_time);
+                } else {
+                    ant.try_harvest_food(current_cell);
                 }
             }
 
-            // Place pheromone
-            if !ant.is_out_of_pheromones() && current_cell.allows_pheromones() {
-                let loss_rate = ANT_PHEROMONE_LOSS_RATE;
-                let remaining = ant.get_pheromones_remaining();
-                let strength = World::calculate_decayed_amount(remaining, delta_time, loss_rate);
-                let lost = (remaining - strength) * loss_rate;
-                ant.place_pheromone(current_cell, strength);
-                ant.lose_pheromones(lost);
-            }
-
-            // Calculate ants speed
-            let distance_traveled_cm = ant.navigator.position.distance(ant.last_position);
-            if delta_time > 0.0 {
-                ant.real_speed_cm_s = distance_traveled_cm / delta_time;
-            } else {
-                ant.real_speed_cm_s = 0.0;
-            }
-            ant.last_position = ant.navigator.position;
-
-            // Handle movement
-            _ = ant.calculate_next_position(delta_time);
+            ant.place_pheromone(current_cell, delta_time);
+            ant.update_speed(delta_time);
+            ant.calculate_next_position(delta_time);
         }
     }
 
@@ -103,35 +61,6 @@ impl World {
         }
         amount
     }
-
-    //pub fn is_same_position(position: Vector2, other_position: Vector2, cell_size: u32) -> bool {
-    //    let half_size = cell_size as f32 / 2.0;
-    //    let dx = (other_position.x - position.x).abs();
-    //    let dy = (other_position.y - position.y).abs();
-    //    dx <= half_size && dy <= half_size
-    //}
-
-    /*
-    pub fn screen_to_grid_coords(&self, position: Vector2) -> Option<(u32, u32)> {
-        let offset_x = self.screen_offset_x;
-        let offset_y = self.screen_offset_y;
-
-        let local_x = position.x - offset_x as f32;
-        let local_y = position.y - offset_y as f32;
-        let grid_x = (local_x / self.grid.cell_size as f32).floor() as i32;
-        let grid_y = (local_y / self.grid.cell_size as f32).floor() as i32;
-
-        if grid_x > 0
-            && grid_y > 0
-            && grid_x < self.grid.cols as i32
-            && grid_y < self.grid.rows as i32
-        {
-            Some((grid_x as u32, grid_y as u32))
-        } else {
-            None
-        }
-    }
-    */
 }
 
 /*

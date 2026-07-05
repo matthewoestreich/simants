@@ -10,7 +10,7 @@ use crate::{
     world::World,
 };
 use raylib::{
-    ffi::{Color, Rectangle, Vector2},
+    ffi::{Color, Vector2},
     prelude::RaylibDraw,
 };
 
@@ -189,6 +189,7 @@ impl Renderer {
         }
     }
 
+    #[allow(dead_code, unused_variables)]
     pub fn draw_ant_projection_circle(&mut self, ant: &Ant, d: &mut impl RaylibDraw) {
         // Determine grid positions using your saved fields
         let absolute_circle_grid = ant.navigator.position + ant.navigator.wander_circle;
@@ -227,7 +228,7 @@ impl Renderer {
             if cell.is_border() && !self.show_border {
                 continue;
             }
-            if cell.is_food() && !self.show_food {
+            if cell.has_food() && !self.show_food {
                 continue;
             }
 
@@ -265,7 +266,7 @@ impl Renderer {
 
         if self.show_food {
             for cell in grid.iter_mut() {
-                if cell.is_food() {
+                if cell.has_food() {
                     let draw = self
                         .viewport
                         .grid_to_world(Vector2::new(cell.x as f32, cell.y as f32));

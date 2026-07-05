@@ -3,8 +3,8 @@ use crate::{
     reynolds::Navigation,
     settings::{
         ANT_HARVEST_AMOUNT_RANGE, ANT_MAX_PHEROMONE_CAPACITY, ANT_MAX_SPEED, ANT_MAX_TURN_FORCE,
-        ANT_PAUSE_FOR_RANGE_IN_SEC, ANT_PAUSE_PROBABILITY, ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE,
-        ANT_TURN_ANGLE, EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE,
+        ANT_PAUSE_FOR_RANGE_IN_SEC, ANT_PAUSE_PROBABILITY, ANT_PHEROMONE_LOSS_RATE,
+        ANT_SENSOR_ANGLE, ANT_SENSOR_DISTANCE, EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE,
     },
 };
 use rand::RngExt as _;
@@ -205,9 +205,10 @@ impl Ant {
             reading: grid.sample_position_with_pheromone_bias(right_loc, self.state),
         };
 
+        #[allow(clippy::expect_fun_call)]
         grid.get_cell_mut(
-            self.navigator.position.x.floor() as u32,
-            self.navigator.position.y.floor() as u32,
+            self.navigator.position.x as u32,
+            self.navigator.position.y as u32,
         )
         .expect(&format!(
             "current position to always be valid, ant: {self:?}"
@@ -236,7 +237,7 @@ impl Ant {
 
     fn avoid_obstruction(&mut self, delta_time: f32) -> Option<Vector2> {
         if self.sensors.center.reading.terrain.is_obstruction() {
-            Some(self.navigator.turn_around(0.0..30.0, delta_time))
+            Some(self.navigator.turn_around(0.1..30.0, delta_time))
         } else if self.sensors.left.reading.terrain.is_obstruction()
             && let Some(_obs) = self.sensors.left.location
         {
@@ -262,33 +263,27 @@ impl Ant {
 
         // Use a negative value as a "flag" for if the expected terrain was even found.
         let mut strongest = -1.0;
-        //let mut angle = None;
         let mut sensed_location = None;
 
         if left.terrain == t {
             strongest = left.target_pheromone;
             sensed_location = self.sensors.left.location;
-            //angle = Some(-ANT_SENSOR_ANGLE);
         }
         if center.terrain == t && (strongest < 0.0 || center.target_pheromone > strongest) {
             strongest = center.target_pheromone;
             sensed_location = self.sensors.center.location;
-            //angle = Some(0.0f32);
         }
         if right.terrain == t {
             #[allow(unused_assignments)]
             if strongest < 0.0 || right.target_pheromone > strongest {
                 strongest = right.target_pheromone;
                 sensed_location = self.sensors.right.location;
-                //angle = Some(ANT_SENSOR_ANGLE);
             }
         }
 
         sensed_location
-        // angle
     }
 
-    /// VALUE ALREADY RETURNED IN RDIANS!!!!
     /// Steers towards strongest target pheromone. If the strongest value is still 0.0,
     /// it means we did not sense the target pheromone, so we return None
     fn steer_towards_pheromone(&self) -> Option<Vector2> {
@@ -318,110 +313,60 @@ impl Ant {
         None // They're all 0s, target pheromone was not sensed
     }
 
-    /*
-    pub fn apply_steering(&mut self, steering_angle: f32, delta_time: f32) {
-        let sa_rad = steering_angle.to_radians();
-        if self.is_returning_food() {
-            println!(
-                "{} apply_steering | steering_angle= {steering_angle} | steering_angle_radians= {sa_rad} | velocity= {:?}",
-                self.id, self.velocity
-            );
-        }
-        let desired_velocity = self.velocity.rotate(steering_angle).normalize() * self.speed;
-        if self.is_returning_food() {
-            println!(
-                "  {} apply_steering | desired_velocity= {desired_velocity:?}",
-                self.id
-            );
-        }
-        let steering_force = desired_velocity - self.velocity;
-        if self.is_returning_food() {
-            println!(
-                "  {} apply_steering | steering_force= {steering_force:?}",
-                self.id
-            );
-        }
-        self.steering_force = steering_force.scale(ANT_MAX_TURN_FORCE * delta_time);
-        if self.is_returning_food() {
-            println!(
-                "  {} apply_steering | steering_force[scaled]= {:?}",
-                self.id, self.steering_force
-            );
-        }
-        self.velocity += self.steering_force;
-        if self.is_returning_food() {
-            println!(
-                "  {} apply_steering | updatd velocity= {:?}",
-                self.id, self.velocity
-            );
-        }
-        //if self.velocity.length_sqr() > 0.001 {
-        //    self.velocity = self.velocity.normalize() * self.speed;
-        //    if self.is_returning_food() {
-        //        println!(
-        //            "    {} apply_steering | velocity is > 0.001 | normalized velocity * selff.speed= {:?}",
-        //            self.id, self.velocity,
-        //        );
-        //    }
-        //}
-    }
-    */
-
-    /*
-    pub fn apply_speed_wobble(&mut self, base_speed: f32, delta_time: f32) {
-        match self.state {
-            AntState::Foraging => {
-                let rolled_percent = self
-                    .rng
-                    .random_range(-ANT_SPEED_WOBBLE_PERCENT..=ANT_SPEED_WOBBLE_PERCENT);
-                let max_variance_ratio = rolled_percent / 100.0;
-                let smooth_wobble = max_variance_ratio * ANT_ACCELERATION_RATE * delta_time;
-                self.speed += base_speed * smooth_wobble;
-                let min_allowed = base_speed * (1.0 - (ANT_SPEED_WOBBLE_PERCENT / 100.0));
-                let max_allowed = base_speed * (1.0 + (ANT_SPEED_WOBBLE_PERCENT / 100.0));
-                self.speed = self.speed.clamp(min_allowed, max_allowed);
-            }
-            AntState::ReturningFood => {
-                let target_speed = base_speed * ANT_CARRYING_FOOD_SPEED_PENALTY_PERCENT;
-                self.speed =
-                    self.speed + (target_speed - self.speed) * ANT_ACCELERATION_RATE * delta_time;
-            }
-        }
-
-        if self.speed < 0.0 {
-            self.speed = 0.0;
-        }
-    }
-    */
-
-    /*
-    pub fn steer_towards_position(&mut self, target: Vector2, delta_time: f32) {
-        let to_target = target - self.position;
-        if to_target.length_sqr() <= 0.001 {
+    pub fn place_pheromone(&mut self, cell: &mut Cell, delta_time: f32) {
+        if self.is_out_of_pheromones() || !cell.allows_pheromones() {
             return;
         }
 
-        let current_angle = self.velocity.y.atan2(self.velocity.x);
-        let target_angle = to_target.y.atan2(to_target.x);
-        let mut angle_diff = target_angle - current_angle;
+        let remaining = self.pheromone_tank;
+        let strength = crate::world::World::calculate_decayed_amount(
+            remaining,
+            delta_time,
+            ANT_PHEROMONE_LOSS_RATE,
+        );
 
-        while angle_diff > std::f32::consts::PI {
-            angle_diff -= 2.0 * std::f32::consts::PI;
-        }
-        while angle_diff < -std::f32::consts::PI {
-            angle_diff += 2.0 * std::f32::consts::PI;
-        }
-
-        let max_turn_rate = ANT_TURN_ANGLE.to_radians();
-        let steering_angle = angle_diff.clamp(-max_turn_rate, max_turn_rate);
-        self.apply_steering(steering_angle, delta_time);
-        self.position += self.velocity * delta_time;
+        match self.state {
+            AntState::Foraging => {
+                if strength < cell.to_home {
+                    return;
+                }
+                cell.to_home = strength;
+                let lost = (remaining - strength) * ANT_PHEROMONE_LOSS_RATE;
+                self.lose_pheromones(lost);
+            }
+            AntState::ReturningFood => {
+                if strength < cell.to_food {
+                    return;
+                }
+                cell.to_food = strength;
+                let lost = (remaining - strength) * ANT_PHEROMONE_LOSS_RATE;
+                self.lose_pheromones(lost);
+            }
+        };
     }
-    */
+
+    pub fn update_speed(&mut self, delta_time: f32) {
+        let distance_traveled_cm = self.navigator.position.distance(self.last_position);
+        if delta_time > 0.0 {
+            self.real_speed_cm_s = distance_traveled_cm / delta_time;
+        } else {
+            self.real_speed_cm_s = 0.0;
+        }
+        self.last_position = self.navigator.position;
+    }
+
+    pub fn try_harvest_food(&mut self, current_cell: &mut Cell) {
+        if !self.is_foraging() || !current_cell.has_food() {
+            return;
+        }
+        let harvested_amount = self.harvest(current_cell.food);
+        current_cell.food = (current_cell.food - harvested_amount).max(0.0);
+        self.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
+    }
 
     // Gets a random number from ANT_HARVEST_AMOUNT_RANGE and takes it from
     // capacity_to_harvest_from, then returns amount harvested
-    pub fn harvest(&mut self, capacity_to_harvest_from: f32) -> f32 {
+    fn harvest(&mut self, capacity_to_harvest_from: f32) -> f32 {
         let amount = self
             .rng
             .random_range(ANT_HARVEST_AMOUNT_RANGE)
@@ -430,7 +375,7 @@ impl Ant {
     }
 
     // Attempts to harvest the exact amount provided. Returns amount harvested.
-    pub fn harvest_amount(&mut self, amount: f32) -> f32 {
+    fn harvest_amount(&mut self, amount: f32) -> f32 {
         if amount <= 0.0 {
             return 0.0;
         }
@@ -440,12 +385,20 @@ impl Ant {
     }
 
     // Returns amount delivered..
-    pub fn deliver_food(&mut self) -> f32 {
-        let delivered = self.food;
-        self.harvested_amount += delivered;
-        self.food = 0.0;
-        self.state = AntState::Foraging;
-        delivered
+    pub fn deliver_food(&mut self, colony_center: &Vector2) -> Option<f32> {
+        if !self.is_returning_food() {
+            return None;
+        }
+        // If ant is at colony center
+        if self.navigator.position.distance_sqr(*colony_center) <= 0.1 {
+            let delivered = self.food;
+            self.harvested_amount += delivered;
+            self.food = 0.0;
+            self.state = AntState::Foraging;
+            self.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
+            return Some(delivered);
+        }
+        None
     }
 
     pub fn handle_pause(&mut self, decrease_pause_time_by: f32) {
@@ -491,10 +444,6 @@ impl Ant {
         true
     }
 
-    fn get_random_wander_angle(&mut self) -> f32 {
-        self.rng.random_range(-ANT_TURN_ANGLE..ANT_TURN_ANGLE)
-    }
-
     pub fn set_pheromone_tank(&mut self, value: f32) {
         self.pheromone_tank = value.max(0.0);
     }
@@ -536,22 +485,6 @@ impl Ant {
 
     pub fn is_out_of_pheromones(&self) -> bool {
         self.pheromone_tank <= 0.0
-    }
-
-    pub fn place_pheromone(&mut self, cell: &mut Cell, strength: f32) {
-        match self.state {
-            AntState::Foraging if strength > cell.to_home => cell.to_home = strength,
-            AntState::ReturningFood if strength > cell.to_food => cell.to_food = strength,
-            _ => {}
-        };
-    }
-
-    pub fn turn_in_any_direction(&mut self) {
-        self.navigator.velocity *= -1.0;
-        let angle = self
-            .rng
-            .random_range(0.0f32.to_radians()..360.0f32.to_radians());
-        self.navigator.velocity = self.navigator.velocity.rotate(angle);
     }
 
     /// `probability_of_pausing` should be >= 0.0 and <= 1.0.

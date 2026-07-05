@@ -1,8 +1,7 @@
-use rand::{Rng, RngExt as _};
+use crate::settings::{ANT_PROJECTION_CIRCLE_DISTANCE, ANT_PROJECTION_CIRCLE_RADIUS};
+use rand::RngExt as _;
 use raylib::prelude::*;
 use std::ops::Range;
-
-use crate::settings::{ANT_PROJECTION_CIRCLE_DISTANCE, ANT_PROJECTION_CIRCLE_RADIUS};
 
 #[derive(Debug, Default, Clone)]
 pub struct Navigation {

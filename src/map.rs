@@ -319,7 +319,7 @@ impl Cell {
         self.terrain.is_colony()
     }
 
-    pub fn is_food(&self) -> bool {
+    pub fn has_food(&self) -> bool {
         self.terrain.is_food()
     }
 
