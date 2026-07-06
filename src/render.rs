@@ -241,7 +241,7 @@ impl Renderer {
             );
 
             if self.show_to_home_pheromones && cell.to_home > 0.0 {
-                let brightness = ((cell.to_home / MAX_RGBA_VALUE) * 2.0) - 0.5;
+                let brightness = (cell.to_home / 5.0) - 1.0;
                 let color = PHEROMONE_FORAGING_COLOR.brightness(brightness);
                 d.draw_rectangle(
                     draw.x as i32,
@@ -252,7 +252,7 @@ impl Renderer {
                 );
             }
             if self.show_to_food_pheromones && cell.to_food > 0.0 {
-                let brightness = ((cell.to_food / MAX_RGBA_VALUE) * 2.0) - 0.5;
+                let brightness = (cell.to_food / 5.0) - 1.0;
                 let color = PHEROMONE_RETURNING_FOOD_COLOR.brightness(brightness);
                 d.draw_rectangle(
                     draw.x as i32,

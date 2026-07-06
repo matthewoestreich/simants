@@ -13,16 +13,19 @@ pub const PERCENT_OF_EXPLORER_ANTS: f32 = 0.0;
 // When an explorer ants time to explore runs out, it goes exploring.
 // We pick a random number in this range so not all ants go exploring at the same time.
 pub const EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE: Range<f32> = 5.0..10.0;
-pub const ANT_LENGTH: f32 = 0.9; // in cm. 1.2 = 1.2cm
+pub const ANT_LENGTH: f32 = 1.2; // in cm. 1.2 = 1.2cm
 pub const ANT_WIDTH: f32 = 0.4; // in cm. 0.4 = 0.4cm
 pub const ANT_MAX_SPEED: f32 = 2.5; // (2.5 seems stable) cm/s with bursts that go higher
-
 pub const ANT_HARVEST_AMOUNT_RANGE: Range<f32> = 10.0..50.0;
 
-// The longer an ant walks, the weaker the pheromones it drops are.
-pub const ANT_PHEROMONE_LOSS_RATE: f32 = 0.8; // 0.3 - 0.5 seems to be stable
 pub const ANT_PHEROMONE_GAIN_WHILE_PAUSED: f32 = 0.0;
 pub const ANT_MAX_PHEROMONE_CAPACITY: f32 = 100.0;
+pub const ANT_PHEROMONE_DROP_PER_CM: f32 = 0.25;
+pub const ANT_PHEROMONE_MAX_DROP: f32 = 10.0;
+// The longer an ant walks, the weaker the pheromones it drops are.
+pub const ANT_PHEROMONE_GAMMA: f32 = 30.0;
+// Placed pheromones will evaporate at this rate.
+pub const PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT: f32 = 0.0059; // 0.005 seems to be stable
 
 pub const ANT_MAX_TURN_FORCE: f32 = 15.0;
 pub const ANT_TURN_ANGLE: f32 = 30.0;
@@ -51,9 +54,8 @@ pub const ANT_PAUSE_FOR_RANGE_IN_SEC: Range<f32> = 0.5..1.2;
 pub const ANT_SENSOR_ANGLE: f32 = 45.0;
 // How far in front of an ant it will read sensors.
 // This number will be multiplied by the cell size.
-pub const ANT_SENSOR_DISTANCE: u32 = 2;
+pub const ANT_SENSOR_DISTANCE: u32 = 4;
 
-pub const PHEROMONE_DECAY_RATE: f32 = 0.008; // 0.005 seems to be stable
 pub const FOOD_CELL_MAX_AMOUNT: f32 = 100_000.0;
 pub const MAX_RGBA_VALUE: f32 = 255.0;
 
@@ -81,8 +83,8 @@ pub const WINDOW_HEIGHT: i32 = 800;
 pub const WORLD_WIDTH: i32 = 1000;
 pub const WORLD_HEIGHT: i32 = 600;
 
-pub const GRID_COLS: u32 = 500; //300;
-pub const GRID_ROWS: u32 = 400; //200;
+pub const GRID_COLS: u32 = 300; //300;
+pub const GRID_ROWS: u32 = 200; //200;
 
 /* ----------------------------------- */
 /* ------- Color Options ------------- */
