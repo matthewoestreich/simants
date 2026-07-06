@@ -1,4 +1,8 @@
-use crate::{ant::AntState, world::World};
+use crate::{
+    ant::{AntColony, AntState},
+    settings::{FOOD_CELL_MAX_AMOUNT, FOOD_RADIUS},
+    world::World,
+};
 use raylib::ffi::Vector2;
 
 /* ------------------------------------------------------------------------------ */
@@ -6,12 +10,8 @@ use raylib::ffi::Vector2;
 /* ------------------------------------------------------------------------------ */
 
 pub struct Grid {
-    /// Grid width in pixels - this is NOT number of cols
     pub cols: u32,
-    /// Grid height in pixels - this is NOT number of rows
     pub rows: u32,
-    /// Size of a cells width and height in pixels
-    pub cell_size: u32,
     cells: Vec<Cell>,
 }
 
@@ -25,7 +25,7 @@ impl<'a> IntoIterator for &'a mut Grid {
 }
 
 impl Grid {
-    pub fn new(cols: u32, rows: u32, cell_size: u32) -> Self {
+    pub fn new(cols: u32, rows: u32) -> Self {
         let size = (cols * rows) as usize;
         let mut cells = Vec::with_capacity(size);
 
@@ -35,21 +35,120 @@ impl Grid {
             }
         }
 
-        Self {
-            cols,
-            rows,
-            cell_size,
-            cells,
+        Self { cols, rows, cells }
+    }
+
+    pub fn len(&self) -> usize {
+        self.cells.len()
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Cell> {
+        self.cells.iter_mut()
+    }
+
+    pub fn initialize(&mut self, colony: &AntColony) {
+        let rows = self.rows;
+        let cols = self.cols;
+
+        // For drawing vertical line obstacle in mid of screen
+        let line_len = rows / 2;
+        let line_start_y = (rows - line_len) / 2;
+        let line_end_y = line_start_y + line_len;
+        let mid_w = cols / 2;
+        let x_range = (mid_w - 1)..=(mid_w + 1);
+        let y_range = line_start_y..=line_end_y;
+
+        // For drawing food clump
+        let food_center_x = 225; //(cols * 3) / 4; // 900 / 4
+        let food_center_y = 100; //rows / 2; // 200 / 2 = 100
+        let food_radius = FOOD_RADIUS;
+
+        for cell in &mut self.cells {
+            let cell_x = cell.x;
+            let cell_y = cell.y;
+
+            cell.terrain = Terrain::Empty;
+
+            // Mark border cells
+            if (cell_x == 0 || cell_x == cols - 1) || (cell_y == 0 || cell_y == rows - 1) {
+                cell.terrain = Terrain::Border;
+                continue;
+            }
+
+            // Marks a cell as an obstacle.
+            // This obstacle will eventually be drawn as a vertical line that is centerted horizontally and vertically
+            if x_range.contains(&cell_x) && y_range.contains(&cell_y) {
+                //if y % 20 <= 3 {
+                //    continue;
+                //}
+                cell.terrain = Terrain::Obstacle;
+                continue;
+            }
+
+            // Marks a cell as food.
+            let food_dx = cell_x as i32 - food_center_x;
+            let food_dy = cell_y as i32 - food_center_y;
+            if food_dx * food_dx + food_dy * food_dy <= food_radius as i32 * food_radius as i32 {
+                cell.terrain = Terrain::Food;
+                cell.food = FOOD_CELL_MAX_AMOUNT;
+                continue;
+            }
+
+            // Mark the underlying cells of the colony as such
+            let cell_center = Vector2::new(cell_x as f32 + 0.5, cell_y as f32 + 0.5);
+            // If distance from cell center to colony center is less than or
+            // equal to the colony area, it means we are in the colony.
+            if cell_center.distance_sqr(colony.position) <= colony.area {
+                cell.terrain = Terrain::Colony;
+                continue;
+            }
         }
     }
 
+    pub fn world_to_cell(&self, position: Vector2) -> (u32, u32) {
+        let x = (position.x.floor() as i32).clamp(0, self.cols as i32 - 1);
+        let y = (position.y.floor() as i32).clamp(0, self.rows as i32 - 1);
+
+        (x as u32, y as u32)
+    }
+
+    pub fn get_cell(&self, x: u32, y: u32) -> Option<&Cell> {
+        if !self.is_within_grid_bounds(x, y) {
+            return None;
+        }
+        Some(&self.cells[self.index(x, y)])
+    }
+
+    pub fn get_cell_mut(&mut self, x: u32, y: u32) -> Option<&mut Cell> {
+        if !self.is_within_grid_bounds(x, y) {
+            return None;
+        }
+        let i = self.index(x, y);
+        Some(&mut self.cells[i])
+    }
+
+    pub fn cell_center(&self, x: u32, y: u32) -> Vector2 {
+        Vector2::new(x as f32 + 0.5, y as f32 + 0.5)
+    }
+
+    pub fn is_within_grid_bounds(&self, x: u32, y: u32) -> bool {
+        x < self.cols && y < self.rows
+    }
+
+    fn index(&self, x: u32, y: u32) -> usize {
+        (y * self.cols + x) as usize
+    }
+
+    /*
     pub fn position_is_obstruction(&self, position: Vector2) -> bool {
         if let Some(c) = self.get_cell_from_position(position) {
             return c.is_obstruction();
         }
         true
     }
+    */
 
+    /*
     pub fn position_is_terrain(&self, position: Vector2, terrain: Terrain) -> bool {
         if let Some(c) = self.get_cell_from_position(position) {
             return c.terrain == terrain;
@@ -58,9 +157,12 @@ impl Grid {
         // we can return true since it is technically invalid
         terrain == Terrain::Invalid
     }
+    */
 
     pub fn sample_position(&self, position: Vector2) -> CellSample {
-        if let Some(c) = self.get_cell_from_position(position) {
+        let (x, y) = self.world_to_cell(position);
+
+        if let Some(c) = self.get_cell(x, y) {
             return CellSample {
                 terrain: c.terrain,
                 to_food_strength: c.to_food,
@@ -69,6 +171,7 @@ impl Grid {
                 ..CellSample::default()
             };
         }
+
         CellSample {
             terrain: Terrain::Invalid,
             ..CellSample::default()
@@ -105,45 +208,39 @@ impl Grid {
         this
     }
 
-    pub fn len(&self) -> usize {
-        self.cells.len()
-    }
-
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Cell> {
-        self.cells.iter_mut()
-    }
-
-    pub fn get_cell(&self, x: u32, y: u32) -> Option<&Cell> {
-        if !self.is_within_grid_bounds(x, y) {
-            return None;
-        }
-        Some(&self.cells[self.get_grid_index_from_coords(x, y)])
-    }
-
+    /*
     pub fn get_cell_mut(&mut self, x: u32, y: u32) -> Option<&mut Cell> {
         if !self.is_within_grid_bounds(x, y) {
             return None;
         }
-        let i = self.get_grid_index_from_coords(x, y);
+        let i = self.index(x, y);
         Some(&mut self.cells[i])
     }
+    */
 
+    /*
     pub fn get_cell_from_position(&self, position: Vector2) -> Option<&Cell> {
         let (x, y) = self.position_to_grid_coords(position);
         self.get_cell(x, y)
     }
+    */
 
+    /*
     pub fn get_cell_mut_from_position(&mut self, position: Vector2) -> Option<&mut Cell> {
         let (x, y) = self.position_to_grid_coords(position);
         self.get_cell_mut(x, y)
     }
+    */
 
+    /*
     pub fn position_to_grid_coords(&self, position: Vector2) -> (u32, u32) {
         let x = (position.x / self.cell_size as f32).floor() as u32;
         let y = (position.y / self.cell_size as f32).floor() as u32;
         (x, y)
     }
+    */
 
+    /*
     pub fn grid_coords_to_screen(&self, x: u32, y: u32) -> Option<Vector2> {
         if !self.is_within_grid_bounds(x, y) {
             return None;
@@ -157,15 +254,9 @@ impl Grid {
             y as f32 * cell_size + half_cell,
         ))
     }
+    */
 
-    pub fn is_within_grid_bounds(&self, x: u32, y: u32) -> bool {
-        x < self.cols && y < self.rows
-    }
-
-    fn get_grid_index_from_coords(&self, x: u32, y: u32) -> usize {
-        (y * self.cols + x) as usize
-    }
-
+    /*
     #[allow(dead_code)]
     fn get_grid_index_from_position(&self, position: Vector2) -> Option<usize> {
         let (x, y) = self.position_to_grid_coords(position);
@@ -174,6 +265,7 @@ impl Grid {
         }
         Some(self.get_grid_index_from_coords(x, y))
     }
+    */
 }
 
 /* ------------------------------------------------------------------------------ */
@@ -227,7 +319,7 @@ impl Cell {
         self.terrain.is_colony()
     }
 
-    pub fn is_food(&self) -> bool {
+    pub fn has_food(&self) -> bool {
         self.terrain.is_food()
     }
 
