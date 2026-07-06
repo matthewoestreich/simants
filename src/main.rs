@@ -2,16 +2,19 @@
 #![allow(clippy::field_reassign_with_default)]
 
 mod ant;
+mod gui;
 mod map;
 mod render;
 mod reynolds;
 mod settings;
 mod world;
 
-use std::time::{Duration, Instant};
-
 use crate::{
     ant::AntColony,
+    gui::{
+        Gui,
+        controls::{DockSide, SlidePanel},
+    },
     map::Grid,
     render::{Renderer, Viewport},
     settings::{
@@ -23,9 +26,11 @@ use crate::{
 use rand::rngs::SmallRng;
 use raylib::{
     RaylibHandle,
-    ffi::{Camera2D, Color, KeyboardKey, MouseButton, Vector2},
-    prelude::{RaylibDraw as _, RaylibMode2DExt as _, RaylibScissorModeExt},
+    ffi::{Camera2D, Color, KeyboardKey, MouseButton, Rectangle, Vector2},
+    prelude::{RaylibDraw as _, RaylibDrawHandle, RaylibMode2DExt as _, RaylibScissorModeExt},
+    rgui::RaylibGuiControls as _,
 };
+use std::time::{Duration, Instant};
 
 fn main() {
     let (mut rl, thread) = raylib::init()
@@ -92,31 +97,53 @@ fn main() {
 
     let mut simulation_time = 0.0;
 
+    let debug_panel = SlidePanel {
+        side: DockSide::Left,
+        open: false,
+        current_size: 0.0,
+        speed: 800.0,
+        title: "Debug".into(),
+        tab_position: Vector2::new(0.0, 150.0),
+        tab_size: Vector2::new(32.0, 120.0),
+        panel_size: Vector2::new(350.0, 300.0),
+        render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle| {
+            d.gui_label(
+                Rectangle {
+                    x: panel.x + 10.0,
+                    y: panel.y + 10.0,
+                    width: 100.0,
+                    height: 20.0,
+                },
+                "FPS",
+            );
+        },
+    };
+
+    let mut gui = Gui::new();
+    gui.register(debug_panel);
+
     /* --------------------------------------- */
     /* ------------ Game Loop ---------------- */
     /* --------------------------------------- */
     while !rl.window_should_close() {
-        if renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
-            handle_key_press(
-                &mut rl, // <<<<<<<
+        if !gui.blocks_mouse(rl.get_mouse_position()) {
+            handle_world_click(
+                &mut world,
                 &mut renderer,
+                &mut rl,
+                &mut camera,
                 &mut is_paused,
                 &mut is_pheromone_mode,
                 &mut is_fast_forwarding,
-            );
-            handle_mouse_wheel(&mut rl, &mut camera, &mut renderer);
-            handle_mouse_click(
-                &mut rl,
-                &mut camera,
-                &mut world,
-                &renderer.viewport,
                 &mut is_dragging,
                 &mut click_start_pos,
             );
         }
 
-        let dt = &rl.get_frame_time();
+        let dt = rl.get_frame_time();
         stats_update_timer -= dt;
+
+        gui.update(dt);
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
@@ -144,7 +171,7 @@ fn main() {
             } else {
                 simulation_time += dt;
                 let world_update_start_t = Instant::now();
-                world.update(*dt, &mut rng);
+                world.update(dt, &mut rng);
                 if stats_update_timer <= 0.0 {
                     world_update_time = world_update_start_t.elapsed();
                 }
@@ -228,12 +255,46 @@ fn main() {
         if stats_update_timer <= 0.0 {
             stats_update_timer = stats_update_interval_seconds;
         }
+
+        gui.draw(&mut d);
     }
 }
 
 /* ---------------------------------------------------------------- */
 /* -------------- Helper Functions -------------------------------- */
 /* ---------------------------------------------------------------- */
+
+#[allow(clippy::too_many_arguments)]
+fn handle_world_click(
+    world: &mut World,
+    renderer: &mut Renderer,
+    rl: &mut RaylibHandle,
+    camera: &mut Camera2D,
+    is_paused: &mut bool,
+    is_pheromone_mode: &mut bool,
+    is_fast_forwarding: &mut bool,
+    is_dragging: &mut bool,
+    click_start_pos: &mut Vector2,
+) {
+    if renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
+        handle_key_press(
+            rl,
+            renderer,
+            is_paused,
+            is_pheromone_mode,
+            is_fast_forwarding,
+        );
+        handle_mouse_wheel(rl, camera, renderer);
+        handle_mouse_click(
+            rl,
+            camera,
+            world,
+            &renderer.viewport,
+            is_dragging,
+            click_start_pos,
+        );
+    }
+}
 
 // Returns tuple of (i32, i32, i32) representng (hours, min, sec)
 fn calc_game_time(simulation_time: f32) -> (i32, i32, i32) {
