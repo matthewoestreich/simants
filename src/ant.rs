@@ -420,7 +420,7 @@ impl Ant {
         self.pheromone_tank
     }
 
-    pub fn lose_pheromones(&mut self, mut value: f32) {
+    pub fn lose_pheromones(&mut self, value: f32) {
         self.pheromone_tank = (self.pheromone_tank - value).max(0.0);
     }
 
