@@ -12,10 +12,7 @@ pub enum DockSide {
     Bottom,
 }
 
-pub struct SlidePanel<RenderFn>
-where
-    RenderFn: FnMut(&mut RaylibDrawHandle, Rectangle),
-{
+pub struct SlidePanel<RenderFn> {
     pub side: DockSide,
     pub open: bool,
     // animation
@@ -28,12 +25,17 @@ where
     // panel
     pub panel_size: Vector2,
     pub render_contents: RenderFn,
+    pub enabled: bool,
 }
 
-impl<RenderFn> GuiComponent for SlidePanel<RenderFn>
+impl<State, RenderFn> GuiComponent<State> for SlidePanel<RenderFn>
 where
-    RenderFn: FnMut(&mut RaylibDrawHandle, Rectangle),
+    RenderFn: FnMut(&mut RaylibDrawHandle, Rectangle, &mut State),
 {
+    fn is_disabled(&self) -> bool {
+        !self.enabled
+    }
+
     fn update(&mut self, delta_time: f32) {
         let target = match self.side {
             DockSide::Left | DockSide::Right => self.panel_size.x,
@@ -50,7 +52,7 @@ where
         }
     }
 
-    fn draw(&mut self, d: &mut RaylibDrawHandle) {
+    fn draw(&mut self, d: &mut RaylibDrawHandle, state: &mut State) {
         let panel = self.panel_rect();
         let tab = self.tab_rect();
 
@@ -58,7 +60,7 @@ where
             d.draw_rectangle_rec(panel, Color::DARKGRAY);
             d.draw_rectangle_lines_ex(panel, 1.0, Color::BLACK);
 
-            (self.render_contents)(d, panel);
+            (self.render_contents)(d, panel, state);
         }
 
         // Tab
@@ -98,7 +100,6 @@ where
                     Color::WHITE,
                 );
             }
-
             DockSide::Top | DockSide::Bottom => {
                 let text_width = d.measure_text(&self.title, font_size) as f32;
                 let x = tab.x + (tab.width - text_width) * 0.5;
@@ -117,10 +118,7 @@ where
     }
 }
 
-impl<RenderFn> SlidePanel<RenderFn>
-where
-    RenderFn: FnMut(&mut RaylibDrawHandle, Rectangle),
-{
+impl<RenderFn> SlidePanel<RenderFn> {
     fn panel_rect(&self) -> Rectangle {
         match self.side {
             DockSide::Left => Rectangle {
@@ -129,21 +127,18 @@ where
                 width: self.current_size,
                 height: self.panel_size.y,
             },
-
             DockSide::Right => Rectangle {
                 x: self.tab_position.x - self.current_size,
                 y: self.tab_position.y,
                 width: self.current_size,
                 height: self.panel_size.y,
             },
-
             DockSide::Top => Rectangle {
                 x: self.tab_position.x,
                 y: 0.0,
                 width: self.panel_size.x,
                 height: self.current_size,
             },
-
             DockSide::Bottom => Rectangle {
                 x: self.tab_position.x,
                 y: self.tab_position.y - self.current_size,
@@ -161,21 +156,18 @@ where
                 width: self.tab_size.x,
                 height: self.tab_size.y,
             },
-
             DockSide::Right => Rectangle {
                 x: self.tab_position.x,
                 y: self.tab_position.y,
                 width: self.tab_size.x,
                 height: self.tab_size.y,
             },
-
             DockSide::Top => Rectangle {
                 x: self.tab_position.x,
                 y: self.current_size,
                 width: self.tab_size.x,
                 height: self.tab_size.y,
             },
-
             DockSide::Bottom => Rectangle {
                 x: self.tab_position.x,
                 y: self.tab_position.y,

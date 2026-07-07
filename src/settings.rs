@@ -54,9 +54,9 @@ pub const ANT_PAUSE_FOR_RANGE_IN_SEC: Range<f32> = 0.5..1.2;
 pub const ANT_SENSOR_ANGLE: f32 = 45.0;
 // How far in front of an ant it will read sensors.
 // This number will be multiplied by the cell size.
-pub const ANT_SENSOR_DISTANCE: u32 = 4;
+pub const ANT_SENSOR_DISTANCE: u32 = 2;
 
-pub const FOOD_CELL_MAX_AMOUNT: f32 = 100_000.0;
+pub const FOOD_CELL_MAX_AMOUNT: f32 = 200.0;
 pub const MAX_RGBA_VALUE: f32 = 255.0;
 
 /* ----------------------------------- */

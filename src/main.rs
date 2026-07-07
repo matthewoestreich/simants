@@ -28,15 +28,55 @@ use raylib::{
     RaylibHandle,
     ffi::{Camera2D, Color, KeyboardKey, MouseButton, Rectangle, Vector2},
     prelude::{RaylibDraw as _, RaylibDrawHandle, RaylibMode2DExt as _, RaylibScissorModeExt},
-    rgui::RaylibGuiControls as _,
 };
 use std::time::{Duration, Instant};
+
+struct AppState {
+    /// Is the simulation paused.
+    pub is_paused: bool,
+    /// Are we dragging within the simulation?
+    pub is_dragging: bool,
+    /// Are we in pheromone mode?
+    pub is_pheromone_mode: bool,
+    /// To help us determine if we are dragging or not
+    pub click_start_pos: Vector2,
+    pub is_fast_forwarding: bool,
+    /// How often to update the GUI with our stats.
+    pub stats_update_interval_sec: f32,
+    /// The timer that keeps track of when we should update stats.
+    pub stats_update_timer: f32,
+    /// The amount of time it took the run the world 'update' fn
+    /// Good for traxking how fast we are performing the actual simulation physics.
+    pub world_update_time: Duration,
+    /// The amount of time it took to run the world 'draw' fn..
+    /// Good for tracking how fast we are drawing things.
+    pub world_render_time: Duration,
+    /// Time elapsed in simulation
+    pub simulation_time: f32,
+    pub fps: u32,
+}
 
 fn main() {
     let (mut rl, thread) = raylib::init()
         .title(TITLE)
         .size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .build();
+
+    rl.set_target_fps(60);
+
+    let mut app_state = AppState {
+        is_paused: false,
+        is_dragging: false,
+        is_pheromone_mode: false,
+        click_start_pos: Vector2::ZERO,
+        is_fast_forwarding: false,
+        stats_update_interval_sec: 0.5,
+        stats_update_timer: 0.0,
+        world_update_time: Duration::ZERO,
+        world_render_time: Duration::ZERO,
+        simulation_time: 0.0,
+        fps: 0,
+    };
 
     let viewport = Viewport::new(
         (WINDOW_WIDTH - WORLD_WIDTH) / 2,
@@ -47,11 +87,9 @@ fn main() {
         GRID_ROWS,
     );
 
-    println!("{GRID_COLS} x {GRID_ROWS}");
+    let mut renderer = Renderer::new(viewport);
 
     let mut rng: SmallRng = rand::make_rng();
-
-    let mut renderer = Renderer::new(viewport);
 
     let colony = AntColony::new_with_immediate_spawn(
         NUM_ANTS,
@@ -82,39 +120,47 @@ fn main() {
         zoom: 1.0,
     };
 
-    rl.set_target_fps(60);
-
-    let mut is_paused = false;
-    let mut is_dragging = false;
-    let mut is_pheromone_mode = false;
-    let mut click_start_pos = Vector2::zero();
-    let mut is_fast_forwarding = false;
-
-    let stats_update_interval_seconds = 0.5f32; // 1.0 = 1second
-    let mut stats_update_timer = 0.0f32;
-    let mut world_update_time = Duration::ZERO;
-    let mut world_render_time = Duration::ZERO;
-
-    let mut simulation_time = 0.0;
-
     let debug_panel = SlidePanel {
-        side: DockSide::Left,
+        side: DockSide::Top,
         open: false,
+        enabled: true,
         current_size: 0.0,
         speed: 800.0,
         title: "Debug".into(),
-        tab_position: Vector2::new(0.0, 150.0),
-        tab_size: Vector2::new(32.0, 120.0),
-        panel_size: Vector2::new(350.0, 300.0),
-        render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle| {
-            d.gui_label(
-                Rectangle {
-                    x: panel.x + 10.0,
-                    y: panel.y + 10.0,
-                    width: 100.0,
-                    height: 20.0,
-                },
-                "FPS",
+        tab_position: Vector2::new((WINDOW_WIDTH - 250) as f32, 0.0),
+        tab_size: Vector2::new(80.0, 22.0),
+        panel_size: Vector2::new(250.0, ((WINDOW_HEIGHT - WORLD_HEIGHT) / 2) as f32 - 22.0),
+        render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle, state: &mut AppState| {
+            let panel_x = panel.x as i32;
+            let panel_y = panel.y as i32;
+
+            d.draw_text(
+                &format!("FPS: {}", state.fps),
+                panel_x + 5,
+                panel_y + 10,
+                16,
+                Color::BLACK,
+            );
+            d.draw_text(
+                &format!("Render: {:?}", state.world_render_time),
+                panel_x + 5,
+                panel_y + 26,
+                16,
+                Color::BLACK,
+            );
+            d.draw_text(
+                &format!("Update: {:?}", state.world_update_time),
+                panel_x + 5,
+                panel_y + 42,
+                16,
+                Color::BLACK,
+            );
+            d.draw_text(
+                &format!("Ants: {NUM_ANTS}"),
+                panel_x + 5,
+                panel_y + 58,
+                16,
+                Color::BLACK,
             );
         },
     };
@@ -132,53 +178,41 @@ fn main() {
                 &mut renderer,
                 &mut rl,
                 &mut camera,
-                &mut is_paused,
-                &mut is_pheromone_mode,
-                &mut is_fast_forwarding,
-                &mut is_dragging,
-                &mut click_start_pos,
+                &mut app_state,
             );
         }
 
         let dt = rl.get_frame_time();
-        stats_update_timer -= dt;
+        app_state.stats_update_timer -= dt;
 
         gui.update(dt);
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
 
-        if !is_paused {
-            if is_fast_forwarding {
+        if !app_state.is_paused {
+            if app_state.is_fast_forwarding {
                 let steps = 5;
                 let stable_dt = 0.01666667;
                 for _ in 0..steps {
-                    simulation_time += stable_dt;
-                    let t = calc_game_time(simulation_time);
-                    d.draw_text(
-                        &format!("Time: {}:{}:{}", t.0, t.1, t.2),
-                        WORLD_WIDTH / 2,
-                        10,
-                        20,
-                        Color::WHITE,
-                    );
+                    app_state.simulation_time += stable_dt;
                     let start_t = Instant::now();
                     world.update(stable_dt, &mut rng);
-                    if stats_update_timer <= 0.0 {
-                        world_update_time = start_t.elapsed();
+                    if app_state.stats_update_timer <= 0.0 {
+                        app_state.world_update_time = start_t.elapsed();
                     }
                 }
             } else {
-                simulation_time += dt;
+                app_state.simulation_time += dt;
                 let world_update_start_t = Instant::now();
                 world.update(dt, &mut rng);
-                if stats_update_timer <= 0.0 {
-                    world_update_time = world_update_start_t.elapsed();
+                if app_state.stats_update_timer <= 0.0 {
+                    app_state.world_update_time = world_update_start_t.elapsed();
                 }
             }
         }
 
-        let t = calc_game_time(simulation_time);
+        let t = calc_game_time(app_state.simulation_time);
         d.draw_text(
             &format!("Time: {}:{}:{}", t.0, t.1, t.2),
             WORLD_WIDTH / 2,
@@ -187,24 +221,10 @@ fn main() {
             Color::WHITE,
         );
 
-        d.draw_text(
-            &format!("FPS: {}", d.get_fps()),
-            WORLD_WIDTH - 20,
-            10,
-            20,
-            Color::WHITE,
-        );
-        d.draw_text(
-            &format!("Update: {world_update_time:?}"),
-            WORLD_WIDTH - 20,
-            50,
-            20,
-            Color::WHITE,
-        );
-
-        let render_time_start = Instant::now();
+        app_state.fps = d.get_fps();
 
         {
+            let render_time_start = Instant::now();
             let mut scissor = d.begin_scissor_mode(
                 renderer.viewport.x,
                 renderer.viewport.y,
@@ -213,28 +233,10 @@ fn main() {
             );
             let mut mode2d = scissor.begin_mode2D(camera);
             renderer.draw_world(&mut world, &mut mode2d);
+            if app_state.stats_update_timer <= 0.0 {
+                app_state.world_render_time = render_time_start.elapsed();
+            }
         }
-
-        if stats_update_timer <= 0.0 {
-            world_render_time = render_time_start.elapsed();
-        }
-
-        // Draw render time stats
-        d.draw_text(
-            &format!("Render: {world_render_time:?}"),
-            WORLD_WIDTH - 20,
-            30,
-            20,
-            Color::WHITE,
-        );
-        // Draw num ants
-        d.draw_text(
-            &format!("Ants: {NUM_ANTS}"),
-            WORLD_WIDTH - 20,
-            70,
-            20,
-            Color::WHITE,
-        );
 
         // Bordr around viewport
         d.draw_rectangle_lines(
@@ -245,18 +247,17 @@ fn main() {
             Color::RED,
         );
 
-        if is_pheromone_mode {
+        if app_state.is_pheromone_mode {
             d.draw_text("PHEROMONE MODE ON", 10, 10, 20, Color::WHITE);
         }
-        if is_fast_forwarding {
+        if app_state.is_fast_forwarding {
             d.draw_text(">> x5 >>", 10, 30, 10, Color::WHITE);
         }
-
-        if stats_update_timer <= 0.0 {
-            stats_update_timer = stats_update_interval_seconds;
+        if app_state.stats_update_timer <= 0.0 {
+            app_state.stats_update_timer = app_state.stats_update_interval_sec;
         }
 
-        gui.draw(&mut d);
+        gui.draw(&mut d, &mut app_state);
     }
 }
 
@@ -264,35 +265,17 @@ fn main() {
 /* -------------- Helper Functions -------------------------------- */
 /* ---------------------------------------------------------------- */
 
-#[allow(clippy::too_many_arguments)]
 fn handle_world_click(
     world: &mut World,
     renderer: &mut Renderer,
     rl: &mut RaylibHandle,
     camera: &mut Camera2D,
-    is_paused: &mut bool,
-    is_pheromone_mode: &mut bool,
-    is_fast_forwarding: &mut bool,
-    is_dragging: &mut bool,
-    click_start_pos: &mut Vector2,
+    app_state: &mut AppState,
 ) {
     if renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
-        handle_key_press(
-            rl,
-            renderer,
-            is_paused,
-            is_pheromone_mode,
-            is_fast_forwarding,
-        );
+        handle_key_press(rl, renderer, app_state);
         handle_mouse_wheel(rl, camera, renderer);
-        handle_mouse_click(
-            rl,
-            camera,
-            world,
-            &renderer.viewport,
-            is_dragging,
-            click_start_pos,
-        );
+        handle_mouse_click(rl, camera, world, &renderer.viewport, app_state);
     }
 }
 
@@ -305,16 +288,10 @@ fn calc_game_time(simulation_time: f32) -> (i32, i32, i32) {
     (hours, minutes, seconds)
 }
 
-fn handle_key_press(
-    rl: &mut RaylibHandle,
-    renderer: &mut Renderer,
-    is_paused: &mut bool,
-    is_pheromone_mode: &mut bool,
-    is_fast_forwarding: &mut bool,
-) {
-    if *is_pheromone_mode {
+fn handle_key_press(rl: &mut RaylibHandle, renderer: &mut Renderer, app_state: &mut AppState) {
+    if app_state.is_pheromone_mode {
         if rl.is_key_pressed(KeyboardKey::KEY_P) {
-            *is_pheromone_mode = false;
+            app_state.is_pheromone_mode = false;
         } else if rl.is_key_pressed(KeyboardKey::KEY_F) {
             renderer.toggle_show_pheromones("FOOD");
         } else if rl.is_key_pressed(KeyboardKey::KEY_H) {
@@ -323,11 +300,11 @@ fn handle_key_press(
             renderer.toggle_show_pheromones("ALL");
         }
     } else if rl.is_key_pressed(KeyboardKey::KEY_F) {
-        *is_fast_forwarding = !*is_fast_forwarding;
+        app_state.is_fast_forwarding = !app_state.is_fast_forwarding;
     } else if rl.is_key_pressed(KeyboardKey::KEY_A) {
         renderer.toggle_show_ants();
     } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
-        *is_pheromone_mode = true;
+        app_state.is_pheromone_mode = true;
     } else if rl.is_key_pressed(KeyboardKey::KEY_B) {
         renderer.toggle_show_border();
     } else if rl.is_key_pressed(KeyboardKey::KEY_G) {
@@ -339,7 +316,7 @@ fn handle_key_press(
     } else if rl.is_key_pressed(KeyboardKey::KEY_O) {
         renderer.toggle_show_food();
     } else if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {
-        *is_paused = !*is_paused;
+        app_state.is_paused = !app_state.is_paused;
     }
 }
 
@@ -384,24 +361,25 @@ fn handle_mouse_click(
     camera: &mut Camera2D,
     world: &mut World,
     world_panel: &Viewport,
-    is_dragging: &mut bool,
-    click_start_pos: &mut Vector2,
+    app_state: &mut AppState,
 ) {
     const DRAG_THRESHOLD: f32 = 5.0;
     // Always use the absolute, raw window mouse coordinates for camera calculations
     let raw_mouse_pos = rl.get_mouse_position();
 
     if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-        *click_start_pos = raw_mouse_pos;
-        *is_dragging = false;
+        app_state.click_start_pos = raw_mouse_pos;
+        app_state.is_dragging = false;
     }
 
     if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
-        if !*is_dragging && raw_mouse_pos.distance(*click_start_pos) > DRAG_THRESHOLD {
-            *is_dragging = true;
+        if !app_state.is_dragging
+            && raw_mouse_pos.distance(app_state.click_start_pos) > DRAG_THRESHOLD
+        {
+            app_state.is_dragging = true;
         }
 
-        if *is_dragging {
+        if app_state.is_dragging {
             let mouse_delta = rl.get_mouse_delta();
             let drag_vector =
                 Vector2::new(mouse_delta.x / camera.zoom, mouse_delta.y / camera.zoom);
@@ -411,7 +389,7 @@ fn handle_mouse_click(
     }
 
     if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
-        if !*is_dragging {
+        if !app_state.is_dragging {
             let click_world_position = rl.get_screen_to_world2D(raw_mouse_pos, *camera);
             let click_grid_position = Vector2::new(
                 (click_world_position.x / world_panel.cell_size.x).floor(),
@@ -434,7 +412,7 @@ fn handle_mouse_click(
             }
             println!();
         }
-        *is_dragging = false;
+        app_state.is_dragging = false;
     }
 
     if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_RIGHT) {

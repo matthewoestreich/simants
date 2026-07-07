@@ -6,10 +6,12 @@ pub mod controls {
     pub use super::slide_panel::*;
 }
 
-pub trait GuiComponent {
+pub trait GuiComponent<State> {
     fn update(&mut self, delta_time: f32);
 
-    fn draw(&mut self, d: &mut RaylibDrawHandle);
+    fn draw(&mut self, d: &mut RaylibDrawHandle, state: &mut State);
+
+    fn is_disabled(&self) -> bool;
 
     #[allow(unused_variables)]
     fn wants_mouse(&self, mouse_pos: Vector2) -> bool {
@@ -17,23 +19,20 @@ pub trait GuiComponent {
     }
 }
 
-pub struct Gui<T>
-where
-    T: GuiComponent,
-{
-    components: Vec<T>,
+pub struct Gui<State> {
+    components: Vec<Box<dyn GuiComponent<State>>>,
 }
 
-impl<T> Gui<T>
-where
-    T: GuiComponent,
-{
+impl<State> Gui<State> {
     pub fn new() -> Self {
         Self { components: vec![] }
     }
 
-    pub fn register(&mut self, component: T) {
-        self.components.push(component);
+    pub fn register<T>(&mut self, component: T)
+    where
+        T: GuiComponent<State> + 'static,
+    {
+        self.components.push(Box::new(component));
     }
 
     pub fn update(&mut self, delta_time: f32) {
@@ -42,9 +41,11 @@ where
         }
     }
 
-    pub fn draw(&mut self, d: &mut RaylibDrawHandle) {
+    pub fn draw(&mut self, d: &mut RaylibDrawHandle, state: &mut State) {
         for component in &mut self.components {
-            component.draw(d);
+            if !component.is_disabled() {
+                component.draw(d, state);
+            }
         }
     }
 

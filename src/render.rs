@@ -44,22 +44,6 @@ impl Viewport {
             && pos.y >= self.y as f32
             && pos.y <= (self.y + self.height) as f32
     }
-
-    /*
-    pub fn world_to_screen(&self, world: Vector2) -> Vector2 {
-        Vector2::new(
-            self.x as f32 + world.x * self.cell_size.x,
-            self.y as f32 + world.y * self.cell_size.y,
-        )
-    }
-
-    pub fn screen_to_world(&self, screen: Vector2) -> Vector2 {
-        Vector2::new(
-            (screen.x - self.x as f32) / self.cell_size.x,
-            (screen.y - self.y as f32) / self.cell_size.y,
-        )
-    }
-    */
 }
 
 #[derive(Default, Debug)]
@@ -241,7 +225,7 @@ impl Renderer {
             );
 
             if self.show_to_home_pheromones && cell.to_home > 0.0 {
-                let brightness = (cell.to_home / 5.0) - 1.0;
+                let brightness = (cell.to_home / 5.0) - 1.5;
                 let color = PHEROMONE_FORAGING_COLOR.brightness(brightness);
                 d.draw_rectangle(
                     draw.x as i32,
@@ -252,7 +236,7 @@ impl Renderer {
                 );
             }
             if self.show_to_food_pheromones && cell.to_food > 0.0 {
-                let brightness = (cell.to_food / 5.0) - 1.0;
+                let brightness = (cell.to_food / 5.0) - 1.5;
                 let color = PHEROMONE_RETURNING_FOOD_COLOR.brightness(brightness);
                 d.draw_rectangle(
                     draw.x as i32,
