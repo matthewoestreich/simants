@@ -17,23 +17,20 @@ pub trait GuiComponent {
     }
 }
 
-pub struct Gui<T>
-where
-    T: GuiComponent,
-{
-    components: Vec<T>,
+pub struct Gui {
+    components: Vec<Box<dyn GuiComponent>>,
 }
 
-impl<T> Gui<T>
-where
-    T: GuiComponent,
-{
+impl Gui {
     pub fn new() -> Self {
         Self { components: vec![] }
     }
 
-    pub fn register(&mut self, component: T) {
-        self.components.push(component);
+    pub fn register<T>(&mut self, component: T)
+    where
+        T: GuiComponent + 'static,
+    {
+        self.components.push(Box::new(component));
     }
 
     pub fn update(&mut self, delta_time: f32) {

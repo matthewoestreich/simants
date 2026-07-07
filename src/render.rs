@@ -44,22 +44,6 @@ impl Viewport {
             && pos.y >= self.y as f32
             && pos.y <= (self.y + self.height) as f32
     }
-
-    /*
-    pub fn world_to_screen(&self, world: Vector2) -> Vector2 {
-        Vector2::new(
-            self.x as f32 + world.x * self.cell_size.x,
-            self.y as f32 + world.y * self.cell_size.y,
-        )
-    }
-
-    pub fn screen_to_world(&self, screen: Vector2) -> Vector2 {
-        Vector2::new(
-            (screen.x - self.x as f32) / self.cell_size.x,
-            (screen.y - self.y as f32) / self.cell_size.y,
-        )
-    }
-    */
 }
 
 #[derive(Default, Debug)]

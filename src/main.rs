@@ -2,6 +2,7 @@
 #![allow(clippy::field_reassign_with_default)]
 
 mod ant;
+mod app;
 mod gui;
 mod map;
 mod render;
@@ -11,6 +12,7 @@ mod world;
 
 use crate::{
     ant::AntColony,
+    app::{App, Simulation, Stats},
     gui::{
         Gui,
         controls::{DockSide, SlidePanel},
@@ -37,6 +39,112 @@ fn main() {
         .title(TITLE)
         .size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .build();
+
+    let viewport = Viewport::new(
+        (WINDOW_WIDTH - WORLD_WIDTH) / 2,
+        (WINDOW_HEIGHT - WORLD_HEIGHT) / 2,
+        WORLD_WIDTH,
+        WORLD_HEIGHT,
+        GRID_COLS,
+        GRID_ROWS,
+    );
+
+    let simulation = Simulation {
+        elapsed_time: 0.0,
+        rng: rand::make_rng(),
+        paused: false,
+        fast_forward: false,
+        camera: Camera2D {
+            target: Vector2::new(
+                (GRID_COLS as f32 * viewport.cell_size.x) / 2.0,
+                (GRID_ROWS as f32 * viewport.cell_size.y) / 2.0,
+            ),
+            offset: Vector2::new(
+                viewport.x as f32 + (WORLD_WIDTH as f32 / 2.0),
+                viewport.y as f32 + (WORLD_HEIGHT as f32 / 2.0),
+            ),
+            rotation: 0.0,
+            zoom: 1.0,
+        },
+        stats: Stats {
+            update_interval: 0.5,
+            update_time: Duration::ZERO,
+            update_timer: 0.0,
+            render_timer: 0.0,
+            render_time: Duration::ZERO,
+        },
+        world: World {
+            grid: Grid::new(GRID_COLS, GRID_ROWS),
+            colony: AntColony {
+                ants: vec![],
+                radius: COLONY_RADIUS,
+                area: COLONY_RADIUS * COLONY_RADIUS,
+                position: Vector2::new(
+                    (GRID_COLS as f32 / 8.0).floor(),
+                    (GRID_ROWS as f32 / 2.0).floor(),
+                ),
+                harvested_food: 0.0,
+            },
+        },
+    };
+
+    let mut app = App {
+        simulation,
+        gui: Gui::new(),
+        renderer: Renderer::new(viewport),
+        input_state: app::InputState {
+            dragging: false,
+            click_start: Vector2::ZERO,
+            pheromone_mode: false,
+        },
+    };
+
+    let debug_panel = SlidePanel {
+        side: DockSide::Left,
+        open: false,
+        current_size: 0.0,
+        speed: 800.0,
+        title: "Debug".into(),
+        tab_position: Vector2::new(0.0, 150.0),
+        tab_size: Vector2::new(32.0, 120.0),
+        panel_size: Vector2::new(350.0, 300.0),
+        render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle| {
+            d.gui_label(
+                Rectangle {
+                    x: panel.x + 10.0,
+                    y: panel.y + 10.0,
+                    width: 100.0,
+                    height: 20.0,
+                },
+                "FPS",
+            );
+        },
+    };
+
+    let colony_panel = SlidePanel {
+        side: DockSide::Right,
+        open: false,
+        current_size: 0.0,
+        speed: 800.0,
+        title: "Debug".into(),
+        tab_position: Vector2::new(0.0, 150.0),
+        tab_size: Vector2::new(32.0, 120.0),
+        panel_size: Vector2::new(350.0, 300.0),
+        render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle| {
+            d.gui_label(
+                Rectangle {
+                    x: panel.x + 10.0,
+                    y: panel.y + 10.0,
+                    width: 100.0,
+                    height: 20.0,
+                },
+                "FPS",
+            );
+        },
+    };
+
+    app.gui.register(debug_panel);
+    app.gui.register(colony_panel);
 
     let viewport = Viewport::new(
         (WINDOW_WIDTH - WORLD_WIDTH) / 2,
