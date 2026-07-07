@@ -1,9 +1,11 @@
 use raylib::{ffi::Vector2, prelude::RaylibDrawHandle};
 
 mod slide_panel;
+mod text_box;
 
 pub mod controls {
     pub use super::slide_panel::*;
+    pub use super::text_box::*;
 }
 
 pub trait GuiComponent {

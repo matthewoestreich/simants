@@ -115,7 +115,21 @@ impl Renderer {
         self.show_ants = !self.show_ants;
     }
 
-    pub fn draw_ant(&mut self, ant: &Ant, d: &mut impl RaylibDraw) {
+    pub fn draw_world(&mut self, world: &mut World, d: &mut impl RaylibDraw) {
+        self.draw_grid(&mut world.grid, d);
+
+        if self.show_ants {
+            for ant in &world.colony.ants {
+                self.draw_ant(ant, d);
+            }
+        }
+
+        if self.show_colony {
+            self.draw_colony(&mut world.colony, d);
+        }
+    }
+
+    fn draw_ant(&mut self, ant: &Ant, d: &mut impl RaylibDraw) {
         let (mut ant_color, mut sensor_color) = match ant.state {
             AntState::Foraging => (ANT_FORAGING_COLOR, FOOD_COLOR),
             AntState::ReturningFood => (ANT_RETURNING_FOOD_COLOR, COLONY_COLOR),
@@ -174,7 +188,7 @@ impl Renderer {
     }
 
     #[allow(dead_code, unused_variables)]
-    pub fn draw_ant_projection_circle(&mut self, ant: &Ant, d: &mut impl RaylibDraw) {
+    fn draw_ant_projection_circle(&mut self, ant: &Ant, d: &mut impl RaylibDraw) {
         // Determine grid positions using your saved fields
         let absolute_circle_grid = ant.navigator.position + ant.navigator.wander_circle;
         let absolute_dot_grid = absolute_circle_grid + ant.navigator.wander_circle_displacement;
@@ -196,7 +210,7 @@ impl Renderer {
         d.draw_circle_v(w_target_dot, 2.0, Color::DARKGRAY);
     }
 
-    pub fn draw_grid(&mut self, grid: &mut Grid, d: &mut impl RaylibDraw) {
+    fn draw_grid(&mut self, grid: &mut Grid, d: &mut impl RaylibDraw) {
         for cell in grid.iter_mut() {
             let draw = self
                 .viewport
@@ -285,25 +299,11 @@ impl Renderer {
         }
     }
 
-    pub fn draw_colony(&mut self, colony: &mut AntColony, d: &mut impl RaylibDraw) {
+    fn draw_colony(&mut self, colony: &mut AntColony, d: &mut impl RaylibDraw) {
         let mut color = COLONY_COLOR;
         color.a = 150;
         let pos = self.viewport.grid_to_world(colony.position);
         let rad = colony.radius * self.viewport.cell_size.x;
         d.draw_circle_v(pos, rad, color);
-    }
-
-    pub fn draw_world(&mut self, world: &mut World, d: &mut impl RaylibDraw) {
-        self.draw_grid(&mut world.grid, d);
-
-        if self.show_ants {
-            for ant in &world.colony.ants {
-                self.draw_ant(ant, d);
-            }
-        }
-
-        if self.show_colony {
-            self.draw_colony(&mut world.colony, d);
-        }
     }
 }

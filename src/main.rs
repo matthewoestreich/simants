@@ -12,10 +12,10 @@ mod world;
 
 use crate::{
     ant::AntColony,
-    app::{App, Simulation, Stats},
+    app::{App, InputState, Simulation, SimulationState, Stats},
     gui::{
         Gui,
-        controls::{DockSide, SlidePanel},
+        controls::{DockSide, SlidePanel, TextBox},
     },
     map::Grid,
     render::{Renderer, Viewport},
@@ -40,6 +40,8 @@ fn main() {
         .size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .build();
 
+    rl.set_target_fps(60);
+
     let viewport = Viewport::new(
         (WINDOW_WIDTH - WORLD_WIDTH) / 2,
         (WINDOW_HEIGHT - WORLD_HEIGHT) / 2,
@@ -52,8 +54,10 @@ fn main() {
     let simulation = Simulation {
         elapsed_time: 0.0,
         rng: rand::make_rng(),
-        paused: false,
-        fast_forward: false,
+        state: SimulationState {
+            paused: false,
+            fast_forward: false,
+        },
         camera: Camera2D {
             target: Vector2::new(
                 (GRID_COLS as f32 * viewport.cell_size.x) / 2.0,
@@ -97,6 +101,13 @@ fn main() {
             click_start: Vector2::ZERO,
             pheromone_mode: false,
         },
+    };
+
+    let sim_render_time_stat = TextBox {
+        position: Vector2::new((WORLD_WIDTH / 2) as f32, 10.0),
+        font_size: 20,
+        color: Color::WHITE,
+        render_text: || "foo".into(),
     };
 
     let debug_panel = SlidePanel {
@@ -145,6 +156,11 @@ fn main() {
 
     app.gui.register(debug_panel);
     app.gui.register(colony_panel);
+    app.gui.register(sim_render_time_stat);
+
+    // ///////////////////////////////////////////////////////
+    // OLD
+    // ///////////////////////////////////////////////////////
 
     let viewport = Viewport::new(
         (WINDOW_WIDTH - WORLD_WIDTH) / 2,
@@ -158,9 +174,7 @@ fn main() {
     println!("{GRID_COLS} x {GRID_ROWS}");
 
     let mut rng: SmallRng = rand::make_rng();
-
     let mut renderer = Renderer::new(viewport);
-
     let colony = AntColony::new_with_immediate_spawn(
         NUM_ANTS,
         PERCENT_OF_EXPLORER_ANTS,
@@ -174,9 +188,7 @@ fn main() {
 
     let mut grid = Grid::new(GRID_COLS, GRID_ROWS);
     grid.initialize(&colony);
-
     let mut world = World::new(grid, colony);
-
     let mut camera = Camera2D {
         target: Vector2::new(
             (GRID_COLS as f32 * renderer.viewport.cell_size.x) / 2.0,
@@ -189,8 +201,6 @@ fn main() {
         rotation: 0.0,
         zoom: 1.0,
     };
-
-    rl.set_target_fps(60);
 
     let mut is_paused = false;
     let mut is_dragging = false;
@@ -230,10 +240,100 @@ fn main() {
     let mut gui = Gui::new();
     gui.register(debug_panel);
 
+    app.on_key_press(
+        &rl,
+        |rl: &RaylibHandle,
+         renderer: &mut Renderer,
+         simulation_state: &mut SimulationState,
+         input_state: &mut InputState| {
+            if !renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
+                return;
+            }
+
+            if input_state.pheromone_mode {
+                if rl.is_key_pressed(KeyboardKey::KEY_P) {
+                    input_state.pheromone_mode = false;
+                } else if rl.is_key_pressed(KeyboardKey::KEY_F) {
+                    renderer.toggle_show_pheromones("FOOD");
+                } else if rl.is_key_pressed(KeyboardKey::KEY_H) {
+                    renderer.toggle_show_pheromones("HOME");
+                } else if rl.is_key_pressed(KeyboardKey::KEY_A) {
+                    renderer.toggle_show_pheromones("ALL");
+                }
+            } else if rl.is_key_pressed(KeyboardKey::KEY_F) {
+                simulation_state.fast_forward = !simulation_state.fast_forward;
+            } else if rl.is_key_pressed(KeyboardKey::KEY_A) {
+                renderer.toggle_show_ants();
+            } else if rl.is_key_pressed(KeyboardKey::KEY_P) {
+                input_state.pheromone_mode = true;
+            } else if rl.is_key_pressed(KeyboardKey::KEY_B) {
+                renderer.toggle_show_border();
+            } else if rl.is_key_pressed(KeyboardKey::KEY_G) {
+                renderer.toggle_show_grid();
+            } else if rl.is_key_pressed(KeyboardKey::KEY_S) {
+                renderer.toggle_show_ant_sensors();
+            } else if rl.is_key_pressed(KeyboardKey::KEY_C) {
+                renderer.toggle_show_colony();
+            } else if rl.is_key_pressed(KeyboardKey::KEY_O) {
+                renderer.toggle_show_food();
+            } else if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {
+                simulation_state.paused = !simulation_state.paused;
+            }
+        },
+    );
+
+    app.on_mouse_wheel(
+        &rl,
+        |rl: &RaylibHandle, cam: &mut Camera2D, renderer: &mut Renderer| {
+            let wheel = rl.get_mouse_wheel_move();
+            if wheel != 0.0 {
+                let raw_mouse_pos = rl.get_mouse_position();
+                let world_mouse_before = rl.get_screen_to_world2D(raw_mouse_pos, *cam);
+
+                let scale_factor = 1.0 + (0.15 * wheel.abs());
+                let mut next_zoom = if wheel > 0.0 {
+                    cam.zoom * scale_factor
+                } else {
+                    cam.zoom / scale_factor
+                };
+
+                next_zoom = next_zoom.clamp(1.0, 100.0);
+
+                if next_zoom > 1.0 {
+                    cam.zoom = next_zoom;
+                    let world_mouse_after = rl.get_screen_to_world2D(raw_mouse_pos, *cam);
+                    cam.target.x += world_mouse_before.x - world_mouse_after.x;
+                    cam.target.y += world_mouse_before.y - world_mouse_after.y;
+                } else {
+                    let wp = &renderer.viewport;
+                    // Restore clean home alignment
+                    cam.zoom = 1.0;
+                    cam.target = Vector2::new(
+                        (GRID_COLS as f32 * wp.cell_size.x) / 2.0,
+                        (GRID_ROWS as f32 * wp.cell_size.y) / 2.0,
+                    );
+                    cam.offset = Vector2::new(
+                        wp.x as f32 + (WORLD_WIDTH as f32 / 2.0),
+                        wp.y as f32 + (WORLD_HEIGHT as f32 / 2.0),
+                    );
+                }
+            }
+        },
+    );
+
     /* --------------------------------------- */
     /* ------------ Game Loop ---------------- */
     /* --------------------------------------- */
     while !rl.window_should_close() {
+        app.update(rl.get_frame_time());
+
+        //let mut d = rl.begin_drawing(&thread);
+        //d.clear_background(BACKGROUND_COLOR);
+
+        // //////////////////
+        // OLD
+        // //////////////////
+
         if !gui.blocks_mouse(rl.get_mouse_position()) {
             handle_world_click(
                 &mut world,
