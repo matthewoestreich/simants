@@ -41,6 +41,8 @@ struct AppState {
     /// To help us determine if we are dragging or not
     pub click_start_pos: Vector2,
     pub is_fast_forwarding: bool,
+    /// 5 means full speed is 5x normal speed.
+    pub fast_forward_speed: usize,
     /// How often to update the GUI with our stats.
     pub stats_update_interval_sec: f32,
     /// The timer that keeps track of when we should update stats.
@@ -70,6 +72,7 @@ fn main() {
         is_pheromone_mode: false,
         click_start_pos: Vector2::ZERO,
         is_fast_forwarding: false,
+        fast_forward_speed: 5,
         stats_update_interval_sec: 0.5,
         stats_update_timer: 0.0,
         world_update_time: Duration::ZERO,
@@ -91,21 +94,19 @@ fn main() {
 
     let mut rng: SmallRng = rand::make_rng();
 
-    let colony = AntColony::new_with_immediate_spawn(
-        NUM_ANTS,
-        PERCENT_OF_EXPLORER_ANTS,
-        COLONY_RADIUS,
-        Vector2::new(
-            (GRID_COLS as f32 / 8.0).floor(),
-            (GRID_ROWS as f32 / 2.0).floor(),
+    let mut world = World::new(
+        Grid::new(GRID_COLS, GRID_ROWS),
+        AntColony::new_with_immediate_spawn(
+            NUM_ANTS,
+            PERCENT_OF_EXPLORER_ANTS,
+            COLONY_RADIUS,
+            Vector2::new(
+                (GRID_COLS as f32 / 8.0).floor(),
+                (GRID_ROWS as f32 / 2.0).floor(),
+            ),
+            &mut rng,
         ),
-        &mut rng,
     );
-
-    let mut grid = Grid::new(GRID_COLS, GRID_ROWS);
-    grid.initialize(&colony);
-
-    let mut world = World::new(grid, colony);
 
     let mut camera = Camera2D {
         target: Vector2::new(
@@ -142,14 +143,14 @@ fn main() {
                 Color::BLACK,
             );
             d.draw_text(
-                &format!("Render: {:?}", state.world_render_time),
+                &format!("Render: {:.2?}", state.world_render_time),
                 panel_x + 5,
                 panel_y + 26,
                 16,
                 Color::BLACK,
             );
             d.draw_text(
-                &format!("Update: {:?}", state.world_update_time),
+                &format!("Update: {:.2?}", state.world_update_time),
                 panel_x + 5,
                 panel_y + 42,
                 16,
@@ -182,32 +183,40 @@ fn main() {
             );
         }
 
-        let dt = rl.get_frame_time();
-        app_state.stats_update_timer -= dt;
+        let mut dt = rl.get_frame_time();
 
+        app_state.stats_update_timer -= dt;
         gui.update(dt);
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(BACKGROUND_COLOR);
 
+        app_state.fps = d.get_fps();
+
         if !app_state.is_paused {
             if app_state.is_fast_forwarding {
-                let steps = 5;
-                let stable_dt = 0.01666667;
-                for _ in 0..steps {
-                    app_state.simulation_time += stable_dt;
+                dt = 0.01666667; // stabilize dt
+
+                for _ in 0..app_state.fast_forward_speed {
+                    app_state.simulation_time += dt;
+
                     let start_t = Instant::now();
-                    world.update(stable_dt, &mut rng);
+                    world.update(dt, &mut rng);
+                    let elapsed = start_t.elapsed();
+
                     if app_state.stats_update_timer <= 0.0 {
-                        app_state.world_update_time = start_t.elapsed();
+                        app_state.world_update_time = elapsed;
                     }
                 }
             } else {
                 app_state.simulation_time += dt;
-                let world_update_start_t = Instant::now();
+
+                let start_t = Instant::now();
                 world.update(dt, &mut rng);
+                let elapsed = start_t.elapsed();
+
                 if app_state.stats_update_timer <= 0.0 {
-                    app_state.world_update_time = world_update_start_t.elapsed();
+                    app_state.world_update_time = elapsed;
                 }
             }
         }
@@ -220,8 +229,6 @@ fn main() {
             20,
             Color::WHITE,
         );
-
-        app_state.fps = d.get_fps();
 
         {
             let render_time_start = Instant::now();

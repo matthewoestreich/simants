@@ -11,7 +11,8 @@ pub struct World {
 }
 
 impl World {
-    pub fn new(grid: Grid, colony: AntColony) -> Self {
+    pub fn new(mut grid: Grid, colony: AntColony) -> Self {
+        grid.initialize(&colony);
         Self { grid, colony }
     }
 
