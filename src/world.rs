@@ -4,6 +4,7 @@ use crate::{
     settings::{ANT_MAX_PHEROMONE_CAPACITY, PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT},
 };
 use rand::rngs::SmallRng;
+use raylib::ffi::Vector2;
 
 pub struct World {
     pub colony: AntColony,
@@ -36,7 +37,7 @@ impl World {
 
         for ant in &mut self.colony.ants {
             self.spatial_grid
-                .insert(ant.id as u32, ant.navigator.position);
+                .insert(ant.id as u32, ant.navigator.position, ant.food > 0.0);
         }
 
         // println!("spatial_grid= {:?}", self.spatial_grid);
@@ -59,17 +60,17 @@ impl World {
                     let harvested_amount = ant.harvest(current_cell.food, rng);
                     current_cell.food = (current_cell.food - harvested_amount).max(0.0);
                     ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
-                    continue;
                 }
                 // Deliver food to colony
-                if ant.is_returning_food() && current_cell.is_colony() {
+                else if ant.is_returning_food() && current_cell.is_colony() {
                     if ant.navigator.position.distance_sqr(colony_center) <= 0.1 {
                         self.colony.harvested_food += ant.deliver_food();
                         ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                     } else {
-                        _ = ant.navigator.seek(colony_center, delta_time);
+                        ant.navigator.seek(colony_center, delta_time);
+                        ant.navigator.calculate_next_position(delta_time);
+                        continue;
                     }
-                    continue;
                 }
             }
 
@@ -77,7 +78,41 @@ impl World {
             ant.update_speed(delta_time);
             ant.update_distance_traveled();
             ant.previous_position = ant.navigator.position;
-            ant.calculate_next_position(delta_time, rng);
+            ant.update_steering_force(delta_time, rng);
+
+            // Ants with food don't move out of another ants way.. Ants without food yield to ants
+            // with food
+            let mut separation_force = Vector2::zero();
+            let separation_radius = 2.0;
+            let separation_weight = 0.5;
+
+            let this_ant_has_food = ant.food > 0.0;
+
+            self.spatial_grid.for_each_neighbor(
+                ant.navigator.position,
+                separation_radius,
+                |other_id, other_pos, other_has_food| {
+                    if other_id == ant.id as usize {
+                        return;
+                    }
+                    //if this_ant_has_food && !other_has_food {
+                    //    return;
+                    //}
+
+                    let offset = ant.navigator.position - other_pos;
+                    let distance = offset.length();
+
+                    if distance > 0.0 && distance < separation_radius {
+                        let add_to_sep_force = offset.normalize() * (1.0 / distance);
+                        separation_force += add_to_sep_force;
+                    }
+                },
+            );
+            ant.navigator.current_steering_force += separation_force * separation_weight;
+
+            ant.navigator.calculate_next_position(delta_time);
+            ant.update_speed(delta_time);
+            ant.update_distance_traveled();
         }
     }
 

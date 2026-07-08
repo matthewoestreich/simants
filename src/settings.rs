@@ -8,7 +8,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 1;
+pub const NUM_ANTS: usize = 5_000;
 pub const PERCENT_OF_EXPLORER_ANTS: f32 = 0.0;
 // When an explorer ants time to explore runs out, it goes exploring.
 // We pick a random number in this range so not all ants go exploring at the same time.
@@ -56,7 +56,7 @@ pub const ANT_SENSOR_ANGLE: f32 = 45.0;
 // This number will be multiplied by the cell size.
 pub const ANT_SENSOR_DISTANCE: u32 = 2;
 
-pub const FOOD_CELL_MAX_AMOUNT: f32 = 200.0;
+pub const FOOD_CELL_MAX_AMOUNT: f32 = 100_000.0;
 pub const MAX_RGBA_VALUE: f32 = 255.0;
 
 /* ----------------------------------- */

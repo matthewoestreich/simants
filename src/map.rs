@@ -77,13 +77,13 @@ impl Grid {
 
             // Marks a cell as an obstacle.
             // This obstacle will eventually be drawn as a vertical line that is centerted horizontally and vertically
-            if x_range.contains(&cell_x) && y_range.contains(&cell_y) {
-                //if y % 20 <= 3 {
-                //    continue;
-                //}
-                cell.terrain = Terrain::Obstacle;
-                continue;
-            }
+            //if x_range.contains(&cell_x) && y_range.contains(&cell_y) {
+            //if cell_y % 20 <= 3 {
+            //    continue;
+            //}
+            //     cell.terrain = Terrain::Obstacle;
+            //     continue;
+            // }
 
             // Marks a cell as food.
             let food_dx = cell_x as i32 - food_center_x;
@@ -307,12 +307,12 @@ pub struct SpatialGrid {
     pub cols: usize,
     pub rows: usize,
     pub bucket_size: usize,
-    buckets: Vec<Vec<usize>>,
+    buckets: Vec<Vec<(usize, Vector2, bool)>>,
 }
 
 impl SpatialGrid {
-    pub fn new(cols: u32, rows: u32, separation_radius: u32) -> Self {
-        let bucket_size = separation_radius.max(1) as usize;
+    pub fn new(cols: u32, rows: u32, bucket_size: u32) -> Self {
+        let bucket_size = bucket_size.max(1) as usize;
 
         let bucket_cols = (cols as usize).div_ceil(bucket_size);
         let bucket_rows = (rows as usize).div_ceil(bucket_size);
@@ -329,11 +329,11 @@ impl SpatialGrid {
         y * self.cols + x
     }
 
-    pub fn get_buckets(&self) -> &Vec<Vec<usize>> {
+    pub fn get_buckets(&self) -> &Vec<Vec<(usize, Vector2, bool)>> {
         &self.buckets
     }
 
-    pub fn bucket(&self, x: usize, y: usize) -> &Vec<usize> {
+    pub fn bucket(&self, x: usize, y: usize) -> &Vec<(usize, Vector2, bool)> {
         let idx = self.index(x, y);
         &self.buckets[idx]
     }
@@ -344,7 +344,7 @@ impl SpatialGrid {
         }
     }
 
-    pub fn insert(&mut self, ant_id: u32, position: Vector2) {
+    pub fn insert(&mut self, ant_id: u32, position: Vector2, has_food: bool) {
         let x = (position.x / self.bucket_size as f32).floor() as isize;
         let y = (position.y / self.bucket_size as f32).floor() as isize;
 
@@ -353,20 +353,20 @@ impl SpatialGrid {
         }
 
         let index = self.index(x as usize, y as usize);
-        self.buckets[index].push(ant_id as usize);
+        self.buckets[index].push((ant_id as usize, position, has_food));
     }
 
-    pub fn for_each_neighbor<F>(&self, position: Vector2, mut callback: F)
+    pub fn for_each_neighbor<F>(&self, position: Vector2, search_radius: f32, mut callback: F)
     where
-        F: FnMut(usize),
+        F: FnMut(usize, Vector2, bool),
     {
         let bucket_x = (position.x / self.bucket_size as f32).floor() as isize;
         let bucket_y = (position.y / self.bucket_size as f32).floor() as isize;
 
-        let search_radius = 1;
+        let bucket_radius = (search_radius / self.bucket_size as f32).ceil() as isize;
 
-        for y in (bucket_y - search_radius)..=(bucket_y + search_radius) {
-            for x in (bucket_x - search_radius)..=(bucket_x + search_radius) {
+        for y in (bucket_y - bucket_radius)..=(bucket_y + bucket_radius) {
+            for x in (bucket_x - bucket_radius)..=(bucket_x + bucket_radius) {
                 if x < 0 || y < 0 {
                     continue;
                 }
@@ -375,10 +375,8 @@ impl SpatialGrid {
                     continue;
                 }
 
-                let bucket = self.bucket(x as usize, y as usize);
-
-                for &ant_id in bucket {
-                    callback(ant_id);
+                for &(id, pos, has_food) in self.bucket(x as usize, y as usize) {
+                    callback(id, pos, has_food);
                 }
             }
         }

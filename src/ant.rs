@@ -198,23 +198,24 @@ impl Ant {
         .expect("bad position")
     }
 
-    pub fn calculate_next_position(&mut self, delta_time: f32, rng: &mut SmallRng) -> Vector2 {
-        if let Some(escape_position) = self.avoid_obstruction(delta_time, rng) {
-            escape_position
+    pub fn update_steering_force(&mut self, delta_time: f32, rng: &mut SmallRng) {
+        if let Some(_escape_position) = self.avoid_obstruction(delta_time, rng) {
+            //escape_position;
+            // NO-OP FOR NOW - avoid_obstruction UPDATES STEERING FORCE
         } else if self.is_exploring() {
-            self.navigator.wander(delta_time, rng)
+            self.navigator.wander(delta_time, rng);
         } else if self.is_foraging()
             && let Some(pos) = self.sense_terrain(Terrain::Food)
         {
-            self.navigator.seek(pos, delta_time)
+            self.navigator.seek(pos, delta_time);
         } else if self.is_returning_food()
             && let Some(pos) = self.sense_terrain(Terrain::Colony)
         {
-            self.navigator.seek(pos, delta_time)
+            self.navigator.seek(pos, delta_time);
         } else if let Some(pos) = self.steer_towards_pheromone(rng) {
-            self.navigator.seek(pos, delta_time)
+            self.navigator.seek(pos, delta_time);
         } else {
-            self.navigator.wander(delta_time, rng)
+            self.navigator.wander(delta_time, rng);
         }
     }
 
@@ -303,19 +304,12 @@ impl Ant {
         }
 
         let distance = (self.navigator.position - self.previous_position).length();
-
         if distance <= 0.0 {
-            println!("ant {} did not move, not placing pheromone", self.id);
             return;
         }
 
         let fraction = (self.pheromone_tank / ANT_MAX_PHEROMONE_CAPACITY).clamp(0.0, 1.0);
         let strength = ANT_PHEROMONE_MAX_DROP * fraction.powf(ANT_PHEROMONE_GAMMA);
-
-        //println!(
-        //    "ant {} |current_resevoir= {} | dist_from_old_pos_to_new_pos= {distance:?} | fraction= {fraction} | strength= {strength}",
-        //    self.id, self.pheromone_tank
-        //);
 
         match self.state {
             AntState::Foraging if strength > cell.to_home => cell.to_home = strength,
@@ -323,9 +317,7 @@ impl Ant {
             _ => return,
         };
 
-        let lose = distance * ANT_PHEROMONE_DROP_PER_CM;
-        //println!("   ant {} lost {lose} pheromones", self.id);
-        self.lose_pheromones(lose);
+        self.lose_pheromones(distance * ANT_PHEROMONE_DROP_PER_CM);
     }
 
     pub fn update_speed(&mut self, delta_time: f32) {

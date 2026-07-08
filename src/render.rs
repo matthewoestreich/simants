@@ -302,6 +302,7 @@ impl Renderer {
             }
         }
 
+        /*
         for y in 0..world.spatial_grid.rows {
             for x in 0..world.spatial_grid.cols {
                 if world.spatial_grid.bucket(x, y).is_empty() {
@@ -327,26 +328,26 @@ impl Renderer {
                     1.0,
                     Color::GREEN,
                 );
-                /*
+
                 // draw entire spatial grid
-                let top_left = self.viewport.grid_to_world(Vector2::new(
-                    (x * world.spatial_grid.bucket_size) as f32,
-                    (y * world.spatial_grid.bucket_size) as f32,
-                ));
-                let bottom_right = self.viewport.grid_to_world(Vector2::new(
-                    ((x + 1) * world.spatial_grid.bucket_size) as f32,
-                    ((y + 1) * world.spatial_grid.bucket_size) as f32,
-                ));
-                let rect = Rectangle {
-                    x: top_left.x,
-                    y: top_left.y,
-                    width: bottom_right.x - top_left.x,
-                    height: bottom_right.y - top_left.y,
-                };
-                d.draw_rectangle_lines_ex(rect, 0.5, Color::GREEN);
-                */
+                //let top_left = self.viewport.grid_to_world(Vector2::new(
+                //    (x * world.spatial_grid.bucket_size) as f32,
+                //    (y * world.spatial_grid.bucket_size) as f32,
+                //));
+                //let bottom_right = self.viewport.grid_to_world(Vector2::new(
+                //    ((x + 1) * world.spatial_grid.bucket_size) as f32,
+                //    ((y + 1) * world.spatial_grid.bucket_size) as f32,
+                //));
+                //let rect = Rectangle {
+                //    x: top_left.x,
+                //    y: top_left.y,
+                //    width: bottom_right.x - top_left.x,
+                //    height: bottom_right.y - top_left.y,
+                //};
+                //d.draw_rectangle_lines_ex(rect, 0.5, Color::GREEN);
             }
         }
+        */
 
         if self.show_colony {
             self.draw_colony(&mut world.colony, d);

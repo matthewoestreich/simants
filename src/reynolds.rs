@@ -42,7 +42,7 @@ impl Navigation {
 
     /// Calculates wander force using delta_time for angle drift,
     /// executes physics mutation, and returns the updated position.
-    pub fn wander(&mut self, delta_time: f32, rng: &mut SmallRng) -> Vector2 {
+    pub fn wander(&mut self, delta_time: f32, rng: &mut SmallRng) {
         let circle_radius = ANT_PROJECTION_CIRCLE_RADIUS;
         let circle_distance = ANT_PROJECTION_CIRCLE_DISTANCE;
         let change = 8.0;
@@ -73,12 +73,12 @@ impl Navigation {
             wander_force
         };
 
-        self.calculate_next_position(delta_time)
+        //self.calculate_next_position(delta_time)
     }
 
     /// Calculates force pointing at a target, updates physics,
     /// and returns the updated position.
-    pub fn seek(&mut self, target: Vector2, delta_time: f32) -> Vector2 {
+    pub fn seek(&mut self, target: Vector2, delta_time: f32) {
         let mut desired = target - self.position;
 
         if desired.length() > 0.0 {
@@ -93,7 +93,7 @@ impl Navigation {
             steering_force
         };
 
-        self.calculate_next_position(delta_time)
+        //self.calculate_next_position(delta_time)
     }
 
     /// Directly forces a lateral banking turn, scales the
@@ -162,8 +162,18 @@ impl Navigation {
         self.position
     }
 
+    pub fn apply_steering(&mut self, force: Vector2, delta_time: f32) -> Vector2 {
+        self.current_steering_force = force;
+
+        if self.current_steering_force.length() > self.max_force {
+            self.current_steering_force = self.current_steering_force.normalize() * self.max_force;
+        }
+
+        self.calculate_next_position(delta_time)
+    }
+
     /// Private internal engine method to cleanly consolidate movement code
-    fn calculate_next_position(&mut self, delta_time: f32) -> Vector2 {
+    pub fn calculate_next_position(&mut self, delta_time: f32) -> Vector2 {
         self.velocity += self.current_steering_force * delta_time;
 
         if self.velocity.length() > self.max_speed {

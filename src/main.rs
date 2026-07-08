@@ -96,7 +96,7 @@ fn main() {
 
     let mut world = World::new(
         Grid::new(GRID_COLS, GRID_ROWS),
-        SpatialGrid::new(GRID_COLS, GRID_ROWS, 2),
+        SpatialGrid::new(GRID_COLS, GRID_ROWS, 5),
         AntColony::new_with_immediate_spawn(
             NUM_ANTS,
             PERCENT_OF_EXPLORER_ANTS,
