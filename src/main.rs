@@ -19,7 +19,7 @@ use crate::{
     render::{Renderer, Viewport},
     settings::{
         BACKGROUND_COLOR, COLONY_RADIUS, GRID_COLS, GRID_ROWS, NUM_ANTS, PERCENT_OF_EXPLORER_ANTS,
-        TITLE, WINDOW_HEIGHT, WINDOW_WIDTH, WORLD_HEIGHT, WORLD_WIDTH,
+        SPATIAL_GRID_BUCKET_SIZE, TITLE, WINDOW_HEIGHT, WINDOW_WIDTH, WORLD_HEIGHT, WORLD_WIDTH,
     },
     world::World,
 };
@@ -96,8 +96,8 @@ fn main() {
 
     let mut world = World::new(
         Grid::new(GRID_COLS, GRID_ROWS),
-        SpatialGrid::new(GRID_COLS, GRID_ROWS, 5),
-        AntColony::new_with_immediate_spawn(
+        SpatialGrid::new(GRID_COLS, GRID_ROWS, SPATIAL_GRID_BUCKET_SIZE),
+        AntColony::new(
             NUM_ANTS,
             PERCENT_OF_EXPLORER_ANTS,
             COLONY_RADIUS,
@@ -105,7 +105,6 @@ fn main() {
                 (GRID_COLS as f32 / 8.0).floor(),
                 (GRID_ROWS as f32 / 2.0).floor(),
             ),
-            &mut rng,
         ),
     );
 

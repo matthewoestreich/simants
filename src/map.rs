@@ -329,10 +329,6 @@ impl SpatialGrid {
         y * self.cols + x
     }
 
-    pub fn get_buckets(&self) -> &Vec<Vec<(usize, Vector2, bool)>> {
-        &self.buckets
-    }
-
     pub fn bucket(&self, x: usize, y: usize) -> &Vec<(usize, Vector2, bool)> {
         let idx = self.index(x, y);
         &self.buckets[idx]

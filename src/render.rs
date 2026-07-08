@@ -10,7 +10,7 @@ use crate::{
     world::World,
 };
 use raylib::{
-    ffi::{Color, Rectangle, Vector2},
+    ffi::{Color, Vector2},
     prelude::RaylibDraw,
 };
 

@@ -78,7 +78,7 @@ impl Navigation {
 
     /// Calculates force pointing at a target, updates physics,
     /// and returns the updated position.
-    pub fn seek(&mut self, target: Vector2, delta_time: f32) {
+    pub fn seek(&mut self, target: Vector2) {
         let mut desired = target - self.position;
 
         if desired.length() > 0.0 {
@@ -92,8 +92,6 @@ impl Navigation {
         } else {
             steering_force
         };
-
-        //self.calculate_next_position(delta_time)
     }
 
     /// Directly forces a lateral banking turn, scales the

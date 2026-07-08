@@ -22,58 +22,68 @@ pub struct AntColony {
     pub area: f32,
     pub position: Vector2,
     pub harvested_food: f32,
+    pub target_population: usize,
+    pub explorer_percentage: f32,
+    pub spawn_accumulator: f32,
+    pub spawn_rate: f32,
+    explorer_target: usize,
+    curr_num_explorers: usize,
 }
 
 impl AntColony {
-    pub fn new(num_ants: usize, radius: f32, position: Vector2) -> Self {
-        Self {
-            radius,
-            area: radius * radius,
-            ants: Vec::with_capacity(num_ants),
-            harvested_food: 0.0,
-            position,
-        }
-    }
-
-    pub fn new_with_immediate_spawn(
-        num_ants: usize,
-        percent_of_explorer_ants: f32,
+    pub fn new(
+        target_population: usize,
+        explorer_percentage: f32,
         radius: f32,
         position: Vector2,
-        rng: &mut SmallRng,
     ) -> Self {
-        let mut this = Self::new(num_ants, radius, position);
-        this.spawn_ants(percent_of_explorer_ants, rng);
-        this
+        Self {
+            ants: Vec::with_capacity(target_population),
+            target_population,
+            explorer_percentage,
+            spawn_rate: 200.0,
+            spawn_accumulator: 0.0,
+            radius,
+            area: radius * radius,
+            position,
+            harvested_food: 0.0,
+            explorer_target: (target_population as f32 * explorer_percentage / 100.0).round()
+                as usize,
+            curr_num_explorers: 0,
+        }
     }
 
-    pub fn spawn_ants(&mut self, percent_of_explorer_ants: f32, rng: &mut SmallRng) {
-        let len = if !self.ants.is_empty() {
-            self.ants.len()
-        } else if self.ants.capacity() > 0 {
-            self.ants.capacity()
-        } else {
-            0
-        };
+    pub fn is_at_max_population(&self) -> bool {
+        self.ants.len() == self.target_population
+    }
 
-        // Calculate number of ants that need to be explorers
-        let mut pcnt = ((percent_of_explorer_ants / 100.0) * len as f32).ceil();
-
-        for i in 0..len {
-            let mut ant = Ant::new(self.position, rng);
-
-            ant.id = i as i32;
-            if pcnt > 0.0 {
-                let sec_remaining = rng.random_range(EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE);
-                ant.kind = AntKind::Explorer {
-                    start: sec_remaining,
-                    stop: 0.0,
-                };
-                pcnt -= 1.0;
-            }
-
-            self.ants.insert(i, ant);
+    pub fn update_spawning(&mut self, delta_time: f32, rng: &mut SmallRng) {
+        self.spawn_accumulator += self.spawn_rate * delta_time;
+        while self.spawn_accumulator >= 1.0 && self.ants.len() < self.target_population {
+            self.spawn_ant(rng);
+            self.spawn_accumulator -= 1.0;
         }
+    }
+
+    pub fn spawn_ant(&mut self, rng: &mut SmallRng) {
+        let id = self.ants.len() as i32;
+        let angle = rng.random_range(0.0..std::f32::consts::TAU);
+        let radius = rng.random_range(0.0..self.radius);
+        let position = self.position + Vector2::new(angle.cos(), angle.sin()) * radius;
+
+        let mut ant = Ant::new(position, rng);
+        ant.id = id;
+
+        if self.curr_num_explorers < self.explorer_target {
+            let sec_remaining = rng.random_range(EXPLORER_ANTS_TIME_TO_EXPLORE_RANGE);
+            ant.kind = AntKind::Explorer {
+                start: sec_remaining,
+                stop: 0.0,
+            };
+            self.curr_num_explorers += 1;
+        }
+
+        self.ants.push(ant);
     }
 }
 
@@ -207,13 +217,13 @@ impl Ant {
         } else if self.is_foraging()
             && let Some(pos) = self.sense_terrain(Terrain::Food)
         {
-            self.navigator.seek(pos, delta_time);
+            self.navigator.seek(pos);
         } else if self.is_returning_food()
             && let Some(pos) = self.sense_terrain(Terrain::Colony)
         {
-            self.navigator.seek(pos, delta_time);
+            self.navigator.seek(pos);
         } else if let Some(pos) = self.steer_towards_pheromone(rng) {
-            self.navigator.seek(pos, delta_time);
+            self.navigator.seek(pos);
         } else {
             self.navigator.wander(delta_time, rng);
         }
@@ -399,7 +409,7 @@ impl Ant {
         *stop = rng.random_range(5.0..10.0);
         self.pheromone_tank += 1.0;
 
-        _ = self.navigator.wander(delta_time, rng);
+        self.navigator.wander(delta_time, rng);
 
         true
     }

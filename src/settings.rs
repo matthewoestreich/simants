@@ -8,7 +8,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 5_000;
+pub const NUM_ANTS: usize = 12_000;
 pub const PERCENT_OF_EXPLORER_ANTS: f32 = 0.0;
 // When an explorer ants time to explore runs out, it goes exploring.
 // We pick a random number in this range so not all ants go exploring at the same time.
@@ -29,6 +29,14 @@ pub const PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT: f32 = 0.0059; // 0.005 seem
 
 pub const ANT_MAX_TURN_FORCE: f32 = 15.0;
 pub const ANT_TURN_ANGLE: f32 = 30.0;
+
+// How big are the "cells" within the spatial grid
+// Calculated from GRID_COLS and GRID_ROWS
+pub const SPATIAL_GRID_BUCKET_SIZE: u32 = 8;
+// An ants 'personal space'. Ants within this pixel radius will be separated.
+pub const ANT_SEPARATION_RADIUS: f32 = 2.5;
+// This controls how much separation competes with other behaviors (wander, seek, etc.).
+pub const ANT_SEPARATION_WEIGHT: f32 = 1.5;
 
 pub const ANT_PROJECTION_CIRCLE_RADIUS: f32 = 10.0; // 20.0 seems stable
 pub const ANT_PROJECTION_CIRCLE_DISTANCE: f32 = 20.0; // 50.0 was OG value

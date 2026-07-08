@@ -1,7 +1,10 @@
 use crate::{
     ant::AntColony,
     map::{Grid, SpatialGrid, Terrain},
-    settings::{ANT_MAX_PHEROMONE_CAPACITY, PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT},
+    settings::{
+        ANT_MAX_PHEROMONE_CAPACITY, ANT_SEPARATION_RADIUS, ANT_SEPARATION_WEIGHT,
+        PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT,
+    },
 };
 use rand::rngs::SmallRng;
 use raylib::ffi::Vector2;
@@ -23,6 +26,10 @@ impl World {
     }
 
     pub fn update(&mut self, delta_time: f32, rng: &mut SmallRng) {
+        if !self.colony.is_at_max_population() {
+            self.colony.update_spawning(delta_time, rng);
+        }
+
         for cell in self.grid.iter_mut() {
             match cell.terrain {
                 Terrain::Food if cell.food <= 0.0 => cell.terrain = Terrain::Empty,
@@ -67,7 +74,7 @@ impl World {
                         self.colony.harvested_food += ant.deliver_food();
                         ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                     } else {
-                        ant.navigator.seek(colony_center, delta_time);
+                        ant.navigator.seek(colony_center);
                         ant.navigator.calculate_next_position(delta_time);
                         continue;
                     }
@@ -83,8 +90,8 @@ impl World {
             // Ants with food don't move out of another ants way.. Ants without food yield to ants
             // with food
             let mut separation_force = Vector2::zero();
-            let separation_radius = 2.0;
-            let separation_weight = 0.5;
+            let separation_radius = ANT_SEPARATION_RADIUS;
+            let separation_weight = ANT_SEPARATION_WEIGHT;
 
             let this_ant_has_food = ant.food > 0.0;
 
@@ -95,16 +102,18 @@ impl World {
                     if other_id == ant.id as usize {
                         return;
                     }
-                    //if this_ant_has_food && !other_has_food {
-                    //    return;
-                    //}
+                    if this_ant_has_food && !other_has_food {
+                        return;
+                    }
 
                     let offset = ant.navigator.position - other_pos;
                     let distance = offset.length();
 
                     if distance > 0.0 && distance < separation_radius {
-                        let add_to_sep_force = offset.normalize() * (1.0 / distance);
-                        separation_force += add_to_sep_force;
+                        //let add_to_sep_force = offset.normalize() * (1.0 / distance);
+                        let strength = (separation_radius - distance) / separation_radius;
+                        //separation_force += add_to_sep_force;
+                        separation_force += offset.normalize() * strength;
                     }
                 },
             );
