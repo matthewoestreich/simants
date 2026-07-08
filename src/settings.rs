@@ -77,8 +77,8 @@ pub const FOOD_RADIUS: f32 = 16.0;
 
 pub const TITLE: &str = "Ant Simulation";
 
-pub const WINDOW_WIDTH: i32 = 1200;
-pub const WINDOW_HEIGHT: i32 = 800;
+pub const WINDOW_WIDTH: i32 = 1600;
+pub const WINDOW_HEIGHT: i32 = 1000;
 
 pub const WORLD_WIDTH: i32 = 1000;
 pub const WORLD_HEIGHT: i32 = 600;

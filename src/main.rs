@@ -231,7 +231,6 @@ fn main() {
         );
 
         {
-            let render_time_start = Instant::now();
             let mut scissor = d.begin_scissor_mode(
                 renderer.viewport.x,
                 renderer.viewport.y,
@@ -239,9 +238,13 @@ fn main() {
                 renderer.viewport.height,
             );
             let mut mode2d = scissor.begin_mode2D(camera);
+
+            let start_t = Instant::now();
             renderer.draw_world(&mut world, &mut mode2d);
+            let elapsed = start_t.elapsed();
+
             if app_state.stats_update_timer <= 0.0 {
-                app_state.world_render_time = render_time_start.elapsed();
+                app_state.world_render_time = elapsed;
             }
         }
 
