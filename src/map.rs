@@ -139,26 +139,6 @@ impl Grid {
         (y * self.cols + x) as usize
     }
 
-    /*
-    pub fn position_is_obstruction(&self, position: Vector2) -> bool {
-        if let Some(c) = self.get_cell_from_position(position) {
-            return c.is_obstruction();
-        }
-        true
-    }
-    */
-
-    /*
-    pub fn position_is_terrain(&self, position: Vector2, terrain: Terrain) -> bool {
-        if let Some(c) = self.get_cell_from_position(position) {
-            return c.terrain == terrain;
-        }
-        // If the user wants the check for Invalid and there is no cell found
-        // we can return true since it is technically invalid
-        terrain == Terrain::Invalid
-    }
-    */
-
     pub fn sample_position(&self, position: Vector2) -> CellSample {
         let (x, y) = self.world_to_cell(position);
 
@@ -207,65 +187,6 @@ impl Grid {
 
         this
     }
-
-    /*
-    pub fn get_cell_mut(&mut self, x: u32, y: u32) -> Option<&mut Cell> {
-        if !self.is_within_grid_bounds(x, y) {
-            return None;
-        }
-        let i = self.index(x, y);
-        Some(&mut self.cells[i])
-    }
-    */
-
-    /*
-    pub fn get_cell_from_position(&self, position: Vector2) -> Option<&Cell> {
-        let (x, y) = self.position_to_grid_coords(position);
-        self.get_cell(x, y)
-    }
-    */
-
-    /*
-    pub fn get_cell_mut_from_position(&mut self, position: Vector2) -> Option<&mut Cell> {
-        let (x, y) = self.position_to_grid_coords(position);
-        self.get_cell_mut(x, y)
-    }
-    */
-
-    /*
-    pub fn position_to_grid_coords(&self, position: Vector2) -> (u32, u32) {
-        let x = (position.x / self.cell_size as f32).floor() as u32;
-        let y = (position.y / self.cell_size as f32).floor() as u32;
-        (x, y)
-    }
-    */
-
-    /*
-    pub fn grid_coords_to_screen(&self, x: u32, y: u32) -> Option<Vector2> {
-        if !self.is_within_grid_bounds(x, y) {
-            return None;
-        }
-
-        let cell_size = self.cell_size as f32;
-        let half_cell = cell_size / 2.0;
-
-        Some(Vector2::new(
-            x as f32 * cell_size + half_cell,
-            y as f32 * cell_size + half_cell,
-        ))
-    }
-    */
-
-    /*
-    #[allow(dead_code)]
-    fn get_grid_index_from_position(&self, position: Vector2) -> Option<usize> {
-        let (x, y) = self.position_to_grid_coords(position);
-        if !self.is_within_grid_bounds(x, y) {
-            return None;
-        }
-        Some(self.get_grid_index_from_coords(x, y))
-    }
-    */
 }
 
 /* ------------------------------------------------------------------------------ */
@@ -374,5 +295,92 @@ impl Terrain {
 
     pub fn is_invalid(&self) -> bool {
         matches!(self, Terrain::Invalid)
+    }
+}
+
+/* ------------------------------------------------------------------------------ */
+/* ---------------- SpatialGrid ------------------------------------------------- */
+/* ------------------------------------------------------------------------------ */
+
+#[derive(Debug)]
+pub struct SpatialGrid {
+    pub cols: usize,
+    pub rows: usize,
+    pub bucket_size: usize,
+    buckets: Vec<Vec<usize>>,
+}
+
+impl SpatialGrid {
+    pub fn new(cols: u32, rows: u32, separation_radius: u32) -> Self {
+        let bucket_size = separation_radius.max(1) as usize;
+
+        let bucket_cols = (cols as usize).div_ceil(bucket_size);
+        let bucket_rows = (rows as usize).div_ceil(bucket_size);
+
+        Self {
+            buckets: vec![Vec::new(); bucket_cols * bucket_rows],
+            cols: bucket_cols,
+            rows: bucket_rows,
+            bucket_size,
+        }
+    }
+
+    fn index(&self, x: usize, y: usize) -> usize {
+        y * self.cols + x
+    }
+
+    pub fn get_buckets(&self) -> &Vec<Vec<usize>> {
+        &self.buckets
+    }
+
+    pub fn bucket(&self, x: usize, y: usize) -> &Vec<usize> {
+        let idx = self.index(x, y);
+        &self.buckets[idx]
+    }
+
+    pub fn clear(&mut self) {
+        for bucket in &mut self.buckets {
+            bucket.clear();
+        }
+    }
+
+    pub fn insert(&mut self, ant_id: u32, position: Vector2) {
+        let x = (position.x / self.bucket_size as f32).floor() as isize;
+        let y = (position.y / self.bucket_size as f32).floor() as isize;
+
+        if x < 0 || y < 0 || x >= self.cols as isize || y >= self.rows as isize {
+            return;
+        }
+
+        let index = self.index(x as usize, y as usize);
+        self.buckets[index].push(ant_id as usize);
+    }
+
+    pub fn for_each_neighbor<F>(&self, position: Vector2, mut callback: F)
+    where
+        F: FnMut(usize),
+    {
+        let bucket_x = (position.x / self.bucket_size as f32).floor() as isize;
+        let bucket_y = (position.y / self.bucket_size as f32).floor() as isize;
+
+        let search_radius = 1;
+
+        for y in (bucket_y - search_radius)..=(bucket_y + search_radius) {
+            for x in (bucket_x - search_radius)..=(bucket_x + search_radius) {
+                if x < 0 || y < 0 {
+                    continue;
+                }
+
+                if x >= self.cols as isize || y >= self.rows as isize {
+                    continue;
+                }
+
+                let bucket = self.bucket(x as usize, y as usize);
+
+                for &ant_id in bucket {
+                    callback(ant_id);
+                }
+            }
+        }
     }
 }

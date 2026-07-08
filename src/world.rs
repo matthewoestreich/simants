@@ -1,6 +1,6 @@
 use crate::{
     ant::AntColony,
-    map::{Grid, Terrain},
+    map::{Grid, SpatialGrid, Terrain},
     settings::{ANT_MAX_PHEROMONE_CAPACITY, PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT},
 };
 use rand::rngs::SmallRng;
@@ -8,12 +8,17 @@ use rand::rngs::SmallRng;
 pub struct World {
     pub colony: AntColony,
     pub grid: Grid,
+    pub spatial_grid: SpatialGrid,
 }
 
 impl World {
-    pub fn new(mut grid: Grid, colony: AntColony) -> Self {
+    pub fn new(mut grid: Grid, spatial_grid: SpatialGrid, colony: AntColony) -> Self {
         grid.initialize(&colony);
-        Self { grid, colony }
+        Self {
+            grid,
+            colony,
+            spatial_grid,
+        }
     }
 
     pub fn update(&mut self, delta_time: f32, rng: &mut SmallRng) {
@@ -26,6 +31,15 @@ impl World {
                 _ => {}
             }
         }
+
+        self.spatial_grid.clear();
+
+        for ant in &mut self.colony.ants {
+            self.spatial_grid
+                .insert(ant.id as u32, ant.navigator.position);
+        }
+
+        // println!("spatial_grid= {:?}", self.spatial_grid);
 
         let colony_center = self.colony.position;
 

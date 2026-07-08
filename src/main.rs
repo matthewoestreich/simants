@@ -15,7 +15,7 @@ use crate::{
         Gui,
         controls::{DockSide, SlidePanel},
     },
-    map::Grid,
+    map::{Grid, SpatialGrid},
     render::{Renderer, Viewport},
     settings::{
         BACKGROUND_COLOR, COLONY_RADIUS, GRID_COLS, GRID_ROWS, NUM_ANTS, PERCENT_OF_EXPLORER_ANTS,
@@ -96,6 +96,7 @@ fn main() {
 
     let mut world = World::new(
         Grid::new(GRID_COLS, GRID_ROWS),
+        SpatialGrid::new(GRID_COLS, GRID_ROWS, 2),
         AntColony::new_with_immediate_spawn(
             NUM_ANTS,
             PERCENT_OF_EXPLORER_ANTS,

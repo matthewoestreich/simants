@@ -10,7 +10,7 @@ use crate::{
     world::World,
 };
 use raylib::{
-    ffi::{Color, Vector2},
+    ffi::{Color, Rectangle, Vector2},
     prelude::RaylibDraw,
 };
 
@@ -299,6 +299,52 @@ impl Renderer {
         if self.show_ants {
             for ant in &world.colony.ants {
                 self.draw_ant(ant, d);
+            }
+        }
+
+        for y in 0..world.spatial_grid.rows {
+            for x in 0..world.spatial_grid.cols {
+                if world.spatial_grid.bucket(x, y).is_empty() {
+                    continue;
+                }
+
+                let world_x = (x * world.spatial_grid.bucket_size) as f32;
+                let world_y = (y * world.spatial_grid.bucket_size) as f32;
+
+                let top_left = self.viewport.grid_to_world(Vector2::new(world_x, world_y));
+                let bottom_right = self.viewport.grid_to_world(Vector2::new(
+                    world_x + world.spatial_grid.bucket_size as f32,
+                    world_y + world.spatial_grid.bucket_size as f32,
+                ));
+
+                d.draw_rectangle_lines_ex(
+                    Rectangle {
+                        x: top_left.x,
+                        y: top_left.y,
+                        width: bottom_right.x - top_left.x,
+                        height: bottom_right.y - top_left.y,
+                    },
+                    1.0,
+                    Color::GREEN,
+                );
+                /*
+                // draw entire spatial grid
+                let top_left = self.viewport.grid_to_world(Vector2::new(
+                    (x * world.spatial_grid.bucket_size) as f32,
+                    (y * world.spatial_grid.bucket_size) as f32,
+                ));
+                let bottom_right = self.viewport.grid_to_world(Vector2::new(
+                    ((x + 1) * world.spatial_grid.bucket_size) as f32,
+                    ((y + 1) * world.spatial_grid.bucket_size) as f32,
+                ));
+                let rect = Rectangle {
+                    x: top_left.x,
+                    y: top_left.y,
+                    width: bottom_right.x - top_left.x,
+                    height: bottom_right.y - top_left.y,
+                };
+                d.draw_rectangle_lines_ex(rect, 0.5, Color::GREEN);
+                */
             }
         }
 
