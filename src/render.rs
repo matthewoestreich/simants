@@ -1,17 +1,18 @@
 use crate::{
     ant::{Ant, AntColony, AntKind, AntState},
     map::{Grid, Terrain},
+    profiler::Profiler,
     settings::{
         ANT_FORAGING_COLOR, ANT_LENGTH, ANT_PROJECTION_CIRCLE_RADIUS, ANT_RETURNING_FOOD_COLOR,
-        ANT_WIDTH, BACKGROUND_COLOR, COLONY_COLOR, FOOD_COLOR, GRID_COLS, GRID_ROWS,
-        OBSTACLE_COLOR, PHEROMONE_FORAGING_COLOR, PHEROMONE_RETURNING_FOOD_COLOR, SHOW_ANT_SENSORS,
-        SHOW_ANTS, SHOW_BORDER, SHOW_GRID_LINES, SHOW_PHEROMONES,
+        ANT_SEPARATION_RADIUS, ANT_WIDTH, BACKGROUND_COLOR, COLONY_COLOR, FOOD_COLOR, GRID_COLS,
+        GRID_ROWS, OBSTACLE_COLOR, PHEROMONE_FORAGING_COLOR, PHEROMONE_RETURNING_FOOD_COLOR,
+        SHOW_ANT_SENSORS, SHOW_ANTS, SHOW_BORDER, SHOW_GRID_LINES, SHOW_PHEROMONES,
     },
     world::World,
 };
 use raylib::{
     ffi::{Color, Vector2},
-    prelude::RaylibDraw,
+    prelude::{RaylibDraw, RaylibFont},
 };
 
 #[derive(Default, Debug)]
@@ -131,23 +132,30 @@ impl Renderer {
         let length = ANT_LENGTH;
         let width = ANT_WIDTH;
 
+        //let pos = ant.navigator.position;
+        //let spear_pos = pos + forward * (length * 0.5);
+        //let left_back_pos = pos - forward * (length * 0.5) - right * (width * 0.5);
+        //let right_back_pos = pos - forward * (length * 0.5) + right * (width * 0.5);
+        //
         let pos = ant.navigator.position;
-
-        let spear_pos = pos + forward * (length * 0.5);
-        let left_back_pos = pos - forward * (length * 0.5) - right * (width * 0.5);
-        let right_back_pos = pos - forward * (length * 0.5) + right * (width * 0.5);
-
+        let spear_pos = pos + forward * (length * (2.0 / 3.0));
+        let left_back_pos = pos - forward * (length * (1.0 / 3.0)) - right * (width * 0.5);
+        let right_back_pos = pos - forward * (length * (1.0 / 3.0)) + right * (width * 0.5);
         let spear = self.viewport.grid_to_world(spear_pos);
         let left_back = self.viewport.grid_to_world(left_back_pos);
         let right_back = self.viewport.grid_to_world(right_back_pos);
-
         d.draw_triangle(spear, left_back, right_back, ant_color);
+
+        //let ant_pos = self.viewport.grid_to_world(ant.navigator.position);
+        //d.draw_circle_v(ant_pos, 1.0, Color::WHITE);
+
+        //d.draw_circle_lines_v(ant_pos, ANT_SEPARATION_RADIUS * 2.0, Color::WHITE);
 
         //self.draw_ant_projection_circle(ant, d);
 
-        if matches!(ant.kind, AntKind::Explorer { .. }) {
-            d.draw_triangle_lines(spear, left_back, right_back, Color::YELLOW);
-        }
+        //if matches!(ant.kind, AntKind::Explorer { .. }) {
+        //    d.draw_triangle_lines(spear, left_back, right_back, Color::YELLOW);
+        //}
 
         if self.show_ant_sensors {
             sensor_color.a = 150; // semi-transparent
@@ -205,14 +213,11 @@ impl Renderer {
             let color = match cell.terrain {
                 Terrain::Empty | Terrain::Colony => BACKGROUND_COLOR,
                 Terrain::Obstacle | Terrain::Border => OBSTACLE_COLOR,
-                Terrain::Food => BACKGROUND_COLOR, // FOOD_COLOR,
+                Terrain::Food => FOOD_COLOR,
                 Terrain::Invalid => unreachable!("should never try to draw an invalid cell"),
             };
 
             if cell.is_border() && !self.show_border {
-                continue;
-            }
-            if cell.has_food() && !self.show_food {
                 continue;
             }
 
@@ -248,23 +253,6 @@ impl Renderer {
             }
         }
 
-        if self.show_food {
-            for cell in grid.iter_mut() {
-                if cell.has_food() {
-                    let draw = self
-                        .viewport
-                        .grid_to_world(Vector2::new(cell.x as f32, cell.y as f32));
-                    d.draw_rectangle(
-                        draw.x as i32,
-                        draw.y as i32,
-                        self.viewport.cell_size.x as i32 + 1,
-                        self.viewport.cell_size.y as i32 + 1,
-                        FOOD_COLOR,
-                    );
-                }
-            }
-        }
-
         if self.show_grid {
             let thickness = 0.3;
             let line_color = Color::new(80, 80, 80, 255);
@@ -293,12 +281,23 @@ impl Renderer {
         d.draw_circle_v(pos, rad, color);
     }
 
-    pub fn draw_world(&mut self, world: &mut World, d: &mut impl RaylibDraw) {
-        self.draw_grid(&mut world.grid, d);
+    pub fn draw_world(
+        &mut self,
+        world: &mut World,
+        d: &mut impl RaylibDraw,
+        profiler: &mut Profiler,
+    ) {
+        //{
+        //   let _s = profiler.scope("Draw Grid");
+        //   self.draw_grid(&mut world.grid, d);
+        //}
 
         if self.show_ants {
-            for ant in &world.colony.ants {
-                self.draw_ant(ant, d);
+            {
+                let _s = profiler.scope("Draw Ants");
+                for ant in &world.colony.ants {
+                    self.draw_ant(ant, d);
+                }
             }
         }
 
@@ -319,7 +318,7 @@ impl Renderer {
                 ));
 
                 d.draw_rectangle_lines_ex(
-                    Rectangle {
+                    raylib::ffi::Rectangle {
                         x: top_left.x,
                         y: top_left.y,
                         width: bottom_right.x - top_left.x,
@@ -350,7 +349,10 @@ impl Renderer {
         */
 
         if self.show_colony {
-            self.draw_colony(&mut world.colony, d);
+            {
+                let _s = profiler.scope("Draw Colony");
+                self.draw_colony(&mut world.colony, d);
+            }
         }
     }
 }

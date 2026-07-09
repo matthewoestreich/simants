@@ -4,6 +4,7 @@
 mod ant;
 mod gui;
 mod map;
+mod profiler;
 mod render;
 mod reynolds;
 mod settings;
@@ -16,6 +17,7 @@ use crate::{
         controls::{DockSide, SlidePanel},
     },
     map::{Grid, SpatialGrid},
+    profiler::Profiler,
     render::{Renderer, Viewport},
     settings::{
         BACKGROUND_COLOR, COLONY_RADIUS, GRID_COLS, GRID_ROWS, NUM_ANTS, PERCENT_OF_EXPLORER_ANTS,
@@ -56,6 +58,7 @@ struct AppState {
     /// Time elapsed in simulation
     pub simulation_time: f32,
     pub fps: u32,
+    pub profiler: Profiler,
 }
 
 fn main() {
@@ -65,6 +68,7 @@ fn main() {
         .build();
 
     rl.set_target_fps(60);
+    let mut profiler = Profiler::new();
 
     let mut app_state = AppState {
         is_paused: false,
@@ -79,6 +83,7 @@ fn main() {
         world_render_time: Duration::ZERO,
         simulation_time: 0.0,
         fps: 0,
+        profiler,
     };
 
     let viewport = Viewport::new(
@@ -128,13 +133,37 @@ fn main() {
         current_size: 0.0,
         speed: 800.0,
         title: "Debug".into(),
-        tab_position: Vector2::new((WINDOW_WIDTH - 250) as f32, 0.0),
+        tab_position: Vector2::new((WINDOW_WIDTH - 450) as f32, 0.0),
         tab_size: Vector2::new(80.0, 22.0),
-        panel_size: Vector2::new(250.0, ((WINDOW_HEIGHT - WORLD_HEIGHT) / 2) as f32 - 22.0),
+        panel_size: Vector2::new(450.0, 250.0),
         render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle, state: &mut AppState| {
             let panel_x = panel.x as i32;
             let panel_y = panel.y as i32;
+            let text_x = panel_x + 5;
+            let font_size = 16;
+            let color = Color::BLACK;
+            let mut text_y = panel_y + 10;
 
+            for (name, section) in &state.profiler.sections {
+                let t = format!(
+                    "{:<20} {:>8.3} ms  calls: {}",
+                    name,
+                    section.frame.as_secs_f64() * 1000.0,
+                    section.calls
+                );
+                d.draw_text(&t, text_x, text_y, font_size, color);
+                text_y += font_size;
+            }
+
+            d.draw_text(
+                &format!("FPS: {}", state.fps),
+                text_x,
+                text_y,
+                16,
+                Color::BLACK,
+            );
+
+            /*
             d.draw_text(
                 &format!("FPS: {}", state.fps),
                 panel_x + 5,
@@ -163,6 +192,7 @@ fn main() {
                 16,
                 Color::BLACK,
             );
+            */
         },
     };
 
@@ -173,6 +203,7 @@ fn main() {
     /* ------------ Game Loop ---------------- */
     /* --------------------------------------- */
     while !rl.window_should_close() {
+        app_state.profiler.begin_frame();
         if !gui.blocks_mouse(rl.get_mouse_position()) {
             handle_world_click(
                 &mut world,
@@ -201,7 +232,7 @@ fn main() {
                     app_state.simulation_time += dt;
 
                     let start_t = Instant::now();
-                    world.update(dt, &mut rng);
+                    world.update(dt, &mut rng, &mut app_state.profiler);
                     let elapsed = start_t.elapsed();
 
                     if app_state.stats_update_timer <= 0.0 {
@@ -212,7 +243,7 @@ fn main() {
                 app_state.simulation_time += dt;
 
                 let start_t = Instant::now();
-                world.update(dt, &mut rng);
+                world.update(dt, &mut rng, &mut app_state.profiler);
                 let elapsed = start_t.elapsed();
 
                 if app_state.stats_update_timer <= 0.0 {
@@ -240,7 +271,7 @@ fn main() {
             let mut mode2d = scissor.begin_mode2D(camera);
 
             let start_t = Instant::now();
-            renderer.draw_world(&mut world, &mut mode2d);
+            renderer.draw_world(&mut world, &mut mode2d, &mut app_state.profiler);
             let elapsed = start_t.elapsed();
 
             if app_state.stats_update_timer <= 0.0 {

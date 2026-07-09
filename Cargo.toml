@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 rand = "0.10.1"
+rayon = "1.12"
 raylib = { version = "6.0", features = ["SUPPORT_IMAGE_GENERATION", "raygui"] }
