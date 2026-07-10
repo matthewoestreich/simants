@@ -33,7 +33,7 @@ impl World {
         }
 
         {
-            let _s = profiler.scope("Environment:");
+            let _s = profiler.scope("Update Grid (phero evap, etc):");
 
             for cell in self.grid.iter_mut() {
                 match cell.terrain {
