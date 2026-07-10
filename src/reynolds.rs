@@ -40,8 +40,7 @@ impl Navigation {
         self.velocity.length()
     }
 
-    /// Calculates wander force using delta_time for angle drift,
-    /// executes physics mutation, and returns the updated position.
+    /// Calculates wander force using delta_time for angle drift, executes physics mutation
     pub fn wander(&mut self, delta_time: f32, rng: &mut SmallRng) {
         let circle_radius = ANT_PROJECTION_CIRCLE_RADIUS;
         let circle_distance = ANT_PROJECTION_CIRCLE_DISTANCE;
@@ -76,8 +75,7 @@ impl Navigation {
         //self.calculate_next_position(delta_time)
     }
 
-    /// Calculates force pointing at a target, updates physics,
-    /// and returns the updated position.
+    /// Calculates force pointing at a target, updates physics..
     pub fn seek(&mut self, target: Vector2) {
         let mut desired = target - self.position;
 
@@ -95,7 +93,7 @@ impl Navigation {
     }
 
     /// Directly forces a lateral banking turn, scales the
-    /// internal wander angle to match, updates physics, and returns position.
+    /// internal wander angle to match, updates physics
     pub fn turn_right(&mut self, delta_time: f32) -> Vector2 {
         let forward = if self.velocity.length_sqr() > 0.0 {
             self.velocity.normalize()
@@ -116,7 +114,7 @@ impl Navigation {
     }
 
     /// Directly forces a lateral banking turn to the left,
-    /// scales the internal wander angle counter-clockwise, updates physics, and returns position.
+    /// scales the internal wander angle counter-clockwise, updates physics.
     pub fn turn_left(&mut self, delta_time: f32) -> Vector2 {
         let forward = if self.velocity.length_sqr() > 0.0 {
             self.velocity.normalize()
@@ -137,7 +135,7 @@ impl Navigation {
     }
 
     /// Instantly flips velocity and wander vectors 180 degrees,
-    /// processes the physical position step, and returns the new position.
+    /// processes the physical position step.
     pub fn turn_around(
         &mut self,
         panic_angle: Range<f32>,
@@ -170,7 +168,6 @@ impl Navigation {
         self.calculate_next_position(delta_time)
     }
 
-    /// Private internal engine method to cleanly consolidate movement code
     pub fn calculate_next_position(&mut self, delta_time: f32) -> Vector2 {
         self.velocity += self.current_steering_force * delta_time;
 
