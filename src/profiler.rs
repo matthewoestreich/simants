@@ -44,6 +44,7 @@ impl Profiler {
         }
     }
 
+    #[allow(dead_code)]
     pub fn print(&self) {
         println!("-----------------------------");
 
@@ -55,14 +56,6 @@ impl Profiler {
                 section.calls
             );
         }
-    }
-
-    pub fn get(&self, name: &'static str) -> Option<&ProfileSection> {
-        self.sections.get(name)
-    }
-
-    pub fn reset(&mut self) {
-        self.sections.clear();
     }
 }
 

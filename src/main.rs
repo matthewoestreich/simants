@@ -68,7 +68,12 @@ fn main() {
         .build();
 
     rl.set_target_fps(60);
-    let mut profiler = Profiler::new();
+
+    let ant_texture = rl
+        .load_texture(&thread, "assets/ant.png")
+        .expect("something went wrong loading ant texture");
+
+    let profiler = Profiler::new();
 
     let mut app_state = AppState {
         is_paused: false,
@@ -95,7 +100,7 @@ fn main() {
         GRID_ROWS,
     );
 
-    let mut renderer = Renderer::new(viewport);
+    let mut renderer = Renderer::new(viewport, ant_texture);
 
     let mut rng: SmallRng = rand::make_rng();
 

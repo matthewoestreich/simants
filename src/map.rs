@@ -46,6 +46,10 @@ impl Grid {
         self.cells.iter_mut()
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = &Cell> {
+        self.cells.iter()
+    }
+
     pub fn initialize(&mut self, colony: &AntColony) {
         let rows = self.rows;
         let cols = self.cols;

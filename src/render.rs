@@ -1,18 +1,17 @@
 use crate::{
-    ant::{Ant, AntColony, AntKind, AntState},
+    ant::{Ant, AntColony, AntState},
     map::{Grid, Terrain},
     profiler::Profiler,
     settings::{
         ANT_FORAGING_COLOR, ANT_LENGTH, ANT_PROJECTION_CIRCLE_RADIUS, ANT_RETURNING_FOOD_COLOR,
-        ANT_SEPARATION_RADIUS, ANT_WIDTH, BACKGROUND_COLOR, COLONY_COLOR, FOOD_COLOR, GRID_COLS,
-        GRID_ROWS, OBSTACLE_COLOR, PHEROMONE_FORAGING_COLOR, PHEROMONE_RETURNING_FOOD_COLOR,
+        ANT_WIDTH, COLONY_COLOR, FOOD_COLOR, GRID_COLS, GRID_ROWS, OBSTACLE_COLOR,
         SHOW_ANT_SENSORS, SHOW_ANTS, SHOW_BORDER, SHOW_GRID_LINES, SHOW_PHEROMONES,
     },
     world::World,
 };
 use raylib::{
-    ffi::{Color, Vector2},
-    prelude::{RaylibDraw, RaylibFont},
+    ffi::{Color, Rectangle, Vector2},
+    prelude::{RaylibDraw, Texture2D},
 };
 
 #[derive(Default, Debug)]
@@ -47,9 +46,10 @@ impl Viewport {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Renderer {
     pub viewport: Viewport,
+    pub ant_texture: Texture2D,
     show_grid: bool,
     show_ants: bool,
     show_to_home_pheromones: bool,
@@ -61,9 +61,10 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(viewport: Viewport) -> Self {
+    pub fn new(viewport: Viewport, ant_texture: Texture2D) -> Self {
         Self {
             viewport,
+            ant_texture,
             show_ants: SHOW_ANTS,
             show_colony: true,
             show_grid: SHOW_GRID_LINES,
@@ -127,24 +128,52 @@ impl Renderer {
         }
 
         let forward = ant.navigator.velocity.normalize();
-        let right = Vector2::new(-forward.y, forward.x);
-
-        let length = ANT_LENGTH;
-        let width = ANT_WIDTH;
-
+        //let right = Vector2::new(-forward.y, forward.x);
+        //let length = ANT_LENGTH;
+        //let width = ANT_WIDTH;
         //let pos = ant.navigator.position;
         //let spear_pos = pos + forward * (length * 0.5);
         //let left_back_pos = pos - forward * (length * 0.5) - right * (width * 0.5);
         //let right_back_pos = pos - forward * (length * 0.5) + right * (width * 0.5);
+
+        let pos = self.viewport.grid_to_world(ant.navigator.position);
+
+        let w = self.viewport.cell_size.x * ANT_WIDTH;
+        let h = self.viewport.cell_size.y * ANT_LENGTH;
+
+        d.draw_texture_pro(
+            &self.ant_texture,
+            Rectangle {
+                x: 0.0,
+                y: 0.0,
+                width: self.ant_texture.width as f32,
+                height: self.ant_texture.height as f32,
+            },
+            Rectangle {
+                x: pos.x,
+                y: pos.y,
+                width: w,
+                height: h,
+            },
+            Vector2 {
+                x: w / 2.0,
+                y: h / 2.0,
+            },
+            forward.y.atan2(forward.x).to_degrees() + 90.0,
+            ant_color,
+        );
+
         //
-        let pos = ant.navigator.position;
-        let spear_pos = pos + forward * (length * (2.0 / 3.0));
-        let left_back_pos = pos - forward * (length * (1.0 / 3.0)) - right * (width * 0.5);
-        let right_back_pos = pos - forward * (length * (1.0 / 3.0)) + right * (width * 0.5);
-        let spear = self.viewport.grid_to_world(spear_pos);
-        let left_back = self.viewport.grid_to_world(left_back_pos);
-        let right_back = self.viewport.grid_to_world(right_back_pos);
-        d.draw_triangle(spear, left_back, right_back, ant_color);
+        // ---- WAS USING THIS PRIOR TO PNG ----
+        //
+        //let pos = ant.navigator.position;
+        //let spear_pos = pos + forward * (length * (2.0 / 3.0));
+        //let left_back_pos = pos - forward * (length * (1.0 / 3.0)) - right * (width * 0.5);
+        //let right_back_pos = pos - forward * (length * (1.0 / 3.0)) + right * (width * 0.5);
+        //let spear = self.viewport.grid_to_world(spear_pos);
+        //let left_back = self.viewport.grid_to_world(left_back_pos);
+        //let right_back = self.viewport.grid_to_world(right_back_pos);
+        //d.draw_triangle(spear, left_back, right_back, ant_color);
 
         //let ant_pos = self.viewport.grid_to_world(ant.navigator.position);
         //d.draw_circle_v(ant_pos, 1.0, Color::WHITE);
@@ -205,6 +234,38 @@ impl Renderer {
     }
 
     pub fn draw_grid(&mut self, grid: &mut Grid, d: &mut impl RaylibDraw) {
+        let food_cells = grid.iter().filter(|c| c.terrain == Terrain::Food);
+        let obstruction_cells = grid
+            .iter()
+            .filter(|c| c.terrain == Terrain::Obstacle || c.terrain == Terrain::Border);
+
+        for food_cell in food_cells {
+            let draw = self
+                .viewport
+                .grid_to_world(Vector2::new(food_cell.x as f32, food_cell.y as f32));
+            d.draw_rectangle(
+                draw.x as i32,
+                draw.y as i32,
+                self.viewport.cell_size.x as i32 + 1,
+                self.viewport.cell_size.y as i32 + 1,
+                FOOD_COLOR,
+            );
+        }
+
+        for obstr_cell in obstruction_cells {
+            let draw = self
+                .viewport
+                .grid_to_world(Vector2::new(obstr_cell.x as f32, obstr_cell.y as f32));
+            d.draw_rectangle(
+                draw.x as i32,
+                draw.y as i32,
+                self.viewport.cell_size.x as i32 + 1,
+                self.viewport.cell_size.y as i32 + 1,
+                OBSTACLE_COLOR,
+            );
+        }
+
+        /*
         for cell in grid.iter_mut() {
             let draw = self
                 .viewport
@@ -252,6 +313,7 @@ impl Renderer {
                 );
             }
         }
+        */
 
         if self.show_grid {
             let thickness = 0.3;
@@ -287,10 +349,10 @@ impl Renderer {
         d: &mut impl RaylibDraw,
         profiler: &mut Profiler,
     ) {
-        //{
-        //   let _s = profiler.scope("Draw Grid");
-        //   self.draw_grid(&mut world.grid, d);
-        //}
+        {
+            let _s = profiler.scope("Draw Grid");
+            self.draw_grid(&mut world.grid, d);
+        }
 
         if self.show_ants {
             {

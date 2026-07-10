@@ -72,7 +72,9 @@ impl World {
                     }
                     // Deliver food to colony
                     else if ant.is_returning_food() && current_cell.is_colony() {
-                        if ant.navigator.position.distance_sqr(colony_center) <= 1.0 {
+                        if ant.navigator.position.distance_sqr(colony_center)
+                            <= (self.colony.radius / 2.0)
+                        {
                             self.colony.harvested_food += ant.deliver_food();
                             ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                         } else {
