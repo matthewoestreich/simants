@@ -407,7 +407,7 @@ impl Ant {
 
         *start = 0.0;
         *stop = rng.random_range(5.0..10.0);
-        self.pheromone_tank += 1.0;
+        //self.pheromone_tank += 1.0;
 
         self.navigator.wander(delta_time, rng);
 
