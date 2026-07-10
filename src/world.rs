@@ -33,7 +33,7 @@ impl World {
         }
 
         {
-            let _s = profiler.scope("Environment                 ");
+            let _s = profiler.scope("Environment:");
 
             for cell in self.grid.iter_mut() {
                 match cell.terrain {
@@ -57,7 +57,7 @@ impl World {
                 //}
 
                 let current_cell = {
-                    let _s = profiler.scope("Sense Environment           ");
+                    let _s = profiler.scope("Sense Environment:");
                     ant.sense_environment(&mut self.grid)
                 };
 
@@ -72,8 +72,7 @@ impl World {
                     }
                     // Deliver food to colony
                     else if ant.is_returning_food() && current_cell.is_colony() {
-                        if ant.navigator.position.distance_sqr(colony_center)
-                            <= (self.colony.radius / 2.0)
+                        if ant.navigator.position.distance_sqr(colony_center) <= self.colony.radius
                         {
                             self.colony.harvested_food += ant.deliver_food();
                             ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
@@ -86,12 +85,12 @@ impl World {
                 }
 
                 {
-                    let _s = profiler.scope("Pheromone Placement         ");
+                    let _s = profiler.scope("Pheromone Placement:");
                     ant.try_place_pheromone(current_cell);
                 }
                 ant.previous_position = ant.navigator.position;
                 {
-                    let _s = profiler.scope("Update Steering Force       ");
+                    let _s = profiler.scope("Update Steering Force:");
                     ant.update_steering_force(delta_time, rng);
                 }
 
@@ -131,7 +130,7 @@ impl World {
                 */
 
                 {
-                    let _s = profiler.scope("Movement                    ");
+                    let _s = profiler.scope("Movement:");
                     ant.navigator.calculate_next_position(delta_time);
                 }
                 //{
@@ -146,13 +145,13 @@ impl World {
         }
 
         {
-            let _s = profiler.scope("Clear Spatial Grid          ");
+            let _s = profiler.scope("Clear Spatial Grid:");
             self.spatial_grid.clear();
         }
 
         {
             for ant in &mut self.colony.ants {
-                let _s = profiler.scope("Insert Ant Into Spatial Grid");
+                let _s = profiler.scope("Insert Ant Into Spatial Grid:");
                 self.spatial_grid
                     .insert(ant.id as u32, ant.navigator.position, ant.food > 0.0);
             }
@@ -164,7 +163,7 @@ impl World {
             let separation_weight = ANT_SEPARATION_WEIGHT; // Controls boundary stiffness
 
             for _ in 0..pbd_iterations {
-                let _s = profiler.scope("PBD Collision Resolution    ");
+                let _s = profiler.scope("PBD Collision Resolution:");
 
                 let displacements: Vec<Vector2> = self
                     .colony
@@ -291,7 +290,7 @@ impl World {
         */
 
         {
-            let _s = profiler.scope("Update Final Speeds         ");
+            let _s = profiler.scope("Update Final Speeds:");
             for ant in &mut self.colony.ants {
                 let actual_displacement = ant.navigator.position - ant.previous_position;
                 let distance_moved = actual_displacement.length();

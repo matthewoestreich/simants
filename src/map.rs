@@ -59,7 +59,9 @@ impl Grid {
         let line_start_y = (rows - line_len) / 2;
         let line_end_y = line_start_y + line_len;
         let mid_w = cols / 2;
+        #[allow(unused_variables)]
         let x_range = (mid_w - 1)..=(mid_w + 1);
+        #[allow(unused_variables)]
         let y_range = line_start_y..=line_end_y;
 
         // For drawing food clump

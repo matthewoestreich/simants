@@ -138,14 +138,14 @@ fn main() {
         current_size: 0.0,
         speed: 800.0,
         title: "Debug".into(),
-        tab_position: Vector2::new((WINDOW_WIDTH - 450) as f32, 0.0),
+        tab_position: Vector2::new((WINDOW_WIDTH - 550) as f32, 0.0),
         tab_size: Vector2::new(80.0, 22.0),
-        panel_size: Vector2::new(450.0, 250.0),
+        panel_size: Vector2::new(550.0, 300.0),
         render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle, state: &mut AppState| {
             let panel_x = panel.x as i32;
             let panel_y = panel.y as i32;
             let text_x = panel_x + 5;
-            let font_size = 16;
+            let font_size = 20;
             let color = Color::BLACK;
             let mut text_y = panel_y + 10;
 
@@ -164,7 +164,17 @@ fn main() {
                 &format!("FPS: {}", state.fps),
                 text_x,
                 text_y,
-                16,
+                font_size,
+                Color::BLACK,
+            );
+
+            text_y += font_size;
+
+            d.draw_text(
+                &format!("Grid Size: rows= {GRID_ROWS} | columns= {GRID_COLS}"),
+                text_x,
+                text_y,
+                font_size,
                 Color::BLACK,
             );
 

@@ -5,7 +5,8 @@ use crate::{
     settings::{
         ANT_FORAGING_COLOR, ANT_LENGTH, ANT_PROJECTION_CIRCLE_RADIUS, ANT_RETURNING_FOOD_COLOR,
         ANT_WIDTH, COLONY_COLOR, FOOD_COLOR, GRID_COLS, GRID_ROWS, OBSTACLE_COLOR,
-        SHOW_ANT_SENSORS, SHOW_ANTS, SHOW_BORDER, SHOW_GRID_LINES, SHOW_PHEROMONES,
+        PHEROMONE_FORAGING_COLOR, PHEROMONE_RETURNING_FOOD_COLOR, SHOW_ANT_SENSORS, SHOW_ANTS,
+        SHOW_BORDER, SHOW_GRID_LINES, SHOW_PHEROMONES,
     },
     world::World,
 };
@@ -125,6 +126,13 @@ impl Renderer {
 
         if ant.paused > 0.0 {
             ant_color = Color::PURPLE;
+        }
+        if let crate::ant::AntKind::Explorer { stop, .. } = ant.kind {
+            ant_color = if stop > 0.0 {
+                Color::ORANGE
+            } else {
+                Color::YELLOW
+            };
         }
 
         let forward = ant.navigator.velocity.normalize();
@@ -265,6 +273,36 @@ impl Renderer {
             );
         }
 
+        if self.show_to_home_pheromones && self.show_to_food_pheromones {
+            let phero_cells = grid.iter().filter(|c| c.to_home > 0.0 || c.to_food > 0.0);
+            for pcell in phero_cells {
+                let draw = self
+                    .viewport
+                    .grid_to_world(Vector2::new(pcell.x as f32, pcell.y as f32));
+                if pcell.to_home > 0.0 && pcell.to_food <= 0.0 {
+                    let brightness = (pcell.to_home / 5.0) - 2.0;
+                    let color = PHEROMONE_FORAGING_COLOR.brightness(brightness);
+                    d.draw_rectangle(
+                        draw.x as i32,
+                        draw.y as i32,
+                        self.viewport.cell_size.x as i32 + 1,
+                        self.viewport.cell_size.y as i32 + 1,
+                        color,
+                    );
+                } else {
+                    let brightness = (pcell.to_food / 5.0) - 2.0;
+                    let color = PHEROMONE_RETURNING_FOOD_COLOR.brightness(brightness);
+                    d.draw_rectangle(
+                        draw.x as i32,
+                        draw.y as i32,
+                        self.viewport.cell_size.x as i32 + 1,
+                        self.viewport.cell_size.y as i32 + 1,
+                        color,
+                    );
+                }
+            }
+        }
+
         /*
         for cell in grid.iter_mut() {
             let draw = self
@@ -350,13 +388,13 @@ impl Renderer {
         profiler: &mut Profiler,
     ) {
         {
-            let _s = profiler.scope("Draw Grid");
+            let _s = profiler.scope("Draw Grid:");
             self.draw_grid(&mut world.grid, d);
         }
 
         if self.show_ants {
             {
-                let _s = profiler.scope("Draw Ants");
+                let _s = profiler.scope("Draw Ants:");
                 for ant in &world.colony.ants {
                     self.draw_ant(ant, d);
                 }
@@ -412,7 +450,7 @@ impl Renderer {
 
         if self.show_colony {
             {
-                let _s = profiler.scope("Draw Colony");
+                let _s = profiler.scope("Draw Colony:");
                 self.draw_colony(&mut world.colony, d);
             }
         }
