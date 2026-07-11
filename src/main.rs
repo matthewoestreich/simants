@@ -31,7 +31,6 @@ use raylib::{
     ffi::{Camera2D, Color, KeyboardKey, MouseButton, Rectangle, Vector2},
     prelude::{RaylibDraw as _, RaylibDrawHandle, RaylibMode2DExt as _, RaylibScissorModeExt},
 };
-use std::time::{Duration, Instant};
 
 struct AppState {
     /// Is the simulation paused.
@@ -45,16 +44,6 @@ struct AppState {
     pub is_fast_forwarding: bool,
     /// 5 means full speed is 5x normal speed.
     pub fast_forward_speed: usize,
-    /// How often to update the GUI with our stats.
-    pub stats_update_interval_sec: f32,
-    /// The timer that keeps track of when we should update stats.
-    pub stats_update_timer: f32,
-    /// The amount of time it took the run the world 'update' fn
-    /// Good for traxking how fast we are performing the actual simulation physics.
-    pub world_update_time: Duration,
-    /// The amount of time it took to run the world 'draw' fn..
-    /// Good for tracking how fast we are drawing things.
-    pub world_render_time: Duration,
     /// Time elapsed in simulation
     pub simulation_time: f32,
     pub fps: u32,
@@ -82,10 +71,6 @@ fn main() {
         click_start_pos: Vector2::ZERO,
         is_fast_forwarding: false,
         fast_forward_speed: 5,
-        stats_update_interval_sec: 0.5,
-        stats_update_timer: 0.0,
-        world_update_time: Duration::ZERO,
-        world_render_time: Duration::ZERO,
         simulation_time: 0.0,
         fps: 0,
         profiler,
@@ -140,7 +125,7 @@ fn main() {
         title: "Debug".into(),
         tab_position: Vector2::new((WINDOW_WIDTH - 550) as f32, 0.0),
         tab_size: Vector2::new(80.0, 22.0),
-        panel_size: Vector2::new(550.0, 300.0),
+        panel_size: Vector2::new(550.0, 340.0),
         render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle, state: &mut AppState| {
             let panel_x = panel.x as i32;
             let panel_y = panel.y as i32;
@@ -165,54 +150,42 @@ fn main() {
                 text_x,
                 text_y,
                 font_size,
-                Color::BLACK,
+                color,
             );
 
             text_y += font_size;
 
             d.draw_text(
-                &format!("Grid Size: rows= {GRID_ROWS} | columns= {GRID_COLS}"),
+                &format!(
+                    "Rows='{GRID_ROWS}' Columns='{GRID_COLS}' Cells='{}'",
+                    GRID_ROWS * GRID_COLS
+                ),
                 text_x,
                 text_y,
                 font_size,
-                Color::BLACK,
+                color,
             );
 
-            /*
+            text_y += font_size;
+
             d.draw_text(
-                &format!("FPS: {}", state.fps),
-                panel_x + 5,
-                panel_y + 10,
-                16,
-                Color::BLACK,
+                &format!("Number of Ants: {NUM_ANTS}"),
+                text_x,
+                text_y,
+                font_size,
+                color,
             );
-            d.draw_text(
-                &format!("Render: {:.2?}", state.world_render_time),
-                panel_x + 5,
-                panel_y + 26,
-                16,
-                Color::BLACK,
-            );
-            d.draw_text(
-                &format!("Update: {:.2?}", state.world_update_time),
-                panel_x + 5,
-                panel_y + 42,
-                16,
-                Color::BLACK,
-            );
-            d.draw_text(
-                &format!("Ants: {NUM_ANTS}"),
-                panel_x + 5,
-                panel_y + 58,
-                16,
-                Color::BLACK,
-            );
-            */
         },
     };
 
     let mut gui = Gui::new();
     gui.register(debug_panel);
+
+    println!("Ant        {}", size_of::<ant::Ant>());
+    println!("Navigator  {}", size_of::<crate::reynolds::Navigation>());
+    println!("Sensors    {}", size_of::<ant::Sensors>());
+    println!("Sensor     {}", size_of::<ant::Sensor>());
+    println!("Vector2    {}", size_of::<Vector2>());
 
     /* --------------------------------------- */
     /* ------------ Game Loop ---------------- */
@@ -231,7 +204,6 @@ fn main() {
 
         let mut dt = rl.get_frame_time();
 
-        app_state.stats_update_timer -= dt;
         gui.update(dt);
 
         let mut d = rl.begin_drawing(&thread);
@@ -242,28 +214,13 @@ fn main() {
         if !app_state.is_paused {
             if app_state.is_fast_forwarding {
                 dt = 0.01666667; // stabilize dt
-
                 for _ in 0..app_state.fast_forward_speed {
                     app_state.simulation_time += dt;
-
-                    let start_t = Instant::now();
                     world.update(dt, &mut rng, &mut app_state.profiler);
-                    let elapsed = start_t.elapsed();
-
-                    if app_state.stats_update_timer <= 0.0 {
-                        app_state.world_update_time = elapsed;
-                    }
                 }
             } else {
                 app_state.simulation_time += dt;
-
-                let start_t = Instant::now();
                 world.update(dt, &mut rng, &mut app_state.profiler);
-                let elapsed = start_t.elapsed();
-
-                if app_state.stats_update_timer <= 0.0 {
-                    app_state.world_update_time = elapsed;
-                }
             }
         }
 
@@ -284,14 +241,7 @@ fn main() {
                 renderer.viewport.height,
             );
             let mut mode2d = scissor.begin_mode2D(camera);
-
-            let start_t = Instant::now();
             renderer.draw_world(&mut world, &mut mode2d, &mut app_state.profiler);
-            let elapsed = start_t.elapsed();
-
-            if app_state.stats_update_timer <= 0.0 {
-                app_state.world_render_time = elapsed;
-            }
         }
 
         // Bordr around viewport
@@ -308,9 +258,6 @@ fn main() {
         }
         if app_state.is_fast_forwarding {
             d.draw_text(">> x5 >>", 10, 30, 10, Color::WHITE);
-        }
-        if app_state.stats_update_timer <= 0.0 {
-            app_state.stats_update_timer = app_state.stats_update_interval_sec;
         }
 
         gui.draw(&mut d, &mut app_state);
@@ -369,6 +316,8 @@ fn handle_key_press(rl: &mut RaylibHandle, renderer: &mut Renderer, app_state: &
         renderer.toggle_show_ant_sensors();
     } else if rl.is_key_pressed(KeyboardKey::KEY_C) {
         renderer.toggle_show_colony();
+    } else if rl.is_key_pressed(KeyboardKey::KEY_R) {
+        renderer.toggle_ant_projection_circle();
     } else if rl.is_key_pressed(KeyboardKey::KEY_O) {
         renderer.toggle_show_food();
     } else if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {

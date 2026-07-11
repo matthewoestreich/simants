@@ -59,6 +59,7 @@ pub struct Renderer {
     show_border: bool,
     show_colony: bool,
     show_food: bool,
+    show_ant_projection_circle: bool,
 }
 
 impl Renderer {
@@ -74,6 +75,7 @@ impl Renderer {
             show_to_home_pheromones: SHOW_PHEROMONES,
             show_to_food_pheromones: SHOW_PHEROMONES,
             show_food: true,
+            show_ant_projection_circle: false,
         }
     }
 
@@ -96,6 +98,10 @@ impl Renderer {
             }
             _ => {}
         }
+    }
+
+    pub fn toggle_ant_projection_circle(&mut self) {
+        self.show_ant_projection_circle = !self.show_ant_projection_circle;
     }
 
     pub fn toggle_show_food(&mut self) {
@@ -144,7 +150,7 @@ impl Renderer {
         //let left_back_pos = pos - forward * (length * 0.5) - right * (width * 0.5);
         //let right_back_pos = pos - forward * (length * 0.5) + right * (width * 0.5);
 
-        let pos = self.viewport.grid_to_world(ant.navigator.position);
+        let ant_pos = self.viewport.grid_to_world(ant.navigator.position);
 
         let w = self.viewport.cell_size.x * ANT_WIDTH;
         let h = self.viewport.cell_size.y * ANT_LENGTH;
@@ -158,8 +164,8 @@ impl Renderer {
                 height: self.ant_texture.height as f32,
             },
             Rectangle {
-                x: pos.x,
-                y: pos.y,
+                x: ant_pos.x,
+                y: ant_pos.y,
                 width: w,
                 height: h,
             },
@@ -188,7 +194,9 @@ impl Renderer {
 
         //d.draw_circle_lines_v(ant_pos, ANT_SEPARATION_RADIUS * 2.0, Color::WHITE);
 
-        //self.draw_ant_projection_circle(ant, d);
+        if self.show_ant_projection_circle {
+            self.draw_ant_projection_circle(ant, d);
+        }
 
         //if matches!(ant.kind, AntKind::Explorer { .. }) {
         //    d.draw_triangle_lines(spear, left_back, right_back, Color::YELLOW);
@@ -202,17 +210,17 @@ impl Renderer {
 
             if let Some(l) = sensors.left.location {
                 let pos = self.viewport.grid_to_world(Vector2::new(l.x, l.y));
-                d.draw_line_v(pos, pos, sensor_color);
+                d.draw_line_v(ant_pos, pos, sensor_color);
                 d.draw_rectangle_v(pos, size, sensor_color);
             }
             if let Some(c) = sensors.center.location {
                 let pos = self.viewport.grid_to_world(Vector2::new(c.x, c.y));
-                d.draw_line_v(pos, pos, sensor_color);
+                d.draw_line_v(ant_pos, pos, sensor_color);
                 d.draw_rectangle_v(pos, size, sensor_color);
             }
             if let Some(r) = sensors.right.location {
                 let pos = self.viewport.grid_to_world(Vector2::new(r.x, r.y));
-                d.draw_line_v(pos, pos, sensor_color);
+                d.draw_line_v(ant_pos, pos, sensor_color);
                 d.draw_rectangle_v(pos, size, sensor_color);
             }
         }
@@ -243,9 +251,9 @@ impl Renderer {
 
     pub fn draw_grid(&mut self, grid: &mut Grid, d: &mut impl RaylibDraw) {
         let food_cells = grid.iter().filter(|c| c.terrain == Terrain::Food);
-        let obstruction_cells = grid
-            .iter()
-            .filter(|c| c.terrain == Terrain::Obstacle || c.terrain == Terrain::Border);
+        let obstruction_cells = grid.iter().filter(|c| {
+            c.terrain == Terrain::Obstacle || (c.terrain == Terrain::Border && self.show_border)
+        });
 
         for food_cell in food_cells {
             let draw = self

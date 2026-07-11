@@ -39,7 +39,7 @@ pub const ANT_SEPARATION_RADIUS: f32 = 1.0;
 pub const ANT_SEPARATION_WEIGHT: f32 = 0.05;
 
 pub const ANT_PROJECTION_CIRCLE_RADIUS: f32 = 10.0; // 20.0 seems stable
-pub const ANT_PROJECTION_CIRCLE_DISTANCE: f32 = 20.0; // 50.0 was OG value
+pub const ANT_PROJECTION_CIRCLE_DISTANCE: f32 = 10.0; // 50.0 was OG value
 
 pub const ANT_SPEED_WOBBLE_PERCENT: f32 = 50.0; // Should be btwn 0.1 and 100.0
 pub const ANT_ACCELERATION_RATE: f32 = 5.0; // 5.0 seems stable
