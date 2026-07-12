@@ -103,12 +103,12 @@ impl World {
         drop(profiler_ant_loop_scope);
 
         {
-            let _s = profiler.scope("4. Clear Spatial Grid:");
+            let _s = profiler.scope("4. ClearSpatialGrid");
             self.spatial_grid.clear();
         }
 
         {
-            let _s = profiler.scope("5. Ants->SpatialGrid:");
+            let _s = profiler.scope("5. Ants->SptilGrd");
             for ant in &mut self.colony.ants {
                 self.spatial_grid
                     .insert(ant.id as u32, ant.navigator.position, ant.food > 0.0);
@@ -117,7 +117,7 @@ impl World {
 
         {
             //for _ in 0..pbd_iterations {
-            let profiler_pbd_collisions_scope = profiler.scope("6. PBD Collisions:");
+            let profiler_pbd_collisions_scope = profiler.scope("6. PBD Collisions");
             let displacements: Vec<Vector2> = self
                 .colony
                 .ants
@@ -156,7 +156,7 @@ impl World {
             drop(profiler_pbd_collisions_scope);
 
             {
-                let _s = profiler.scope("7. SetPosViaDsplcmt:");
+                let _s = profiler.scope("7. SetPosViaDsplcmt");
                 for (i, ant) in self.colony.ants.iter_mut().enumerate() {
                     ant.navigator.position += displacements[i];
                 }
@@ -165,7 +165,7 @@ impl World {
         }
 
         {
-            let _s = profiler.scope("Final Speeds:");
+            let _s = profiler.scope("8. Final Speeds");
             for ant in &mut self.colony.ants {
                 let actual_displacement = ant.navigator.position - ant.previous_position;
                 let distance_moved = actual_displacement.length();

@@ -128,7 +128,7 @@ fn main() {
     };
 
     let debug_panel_width = 360;
-    let debug_panel_height = 510.0;
+    let debug_panel_height = 410.0;
     let debug_panel = SlidePanel {
         side: DockSide::Top,
         open: false,
