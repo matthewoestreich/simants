@@ -261,7 +261,7 @@ fn main() {
         }
 
         gui.draw(&mut d, &mut app_state);
-        app_state.profiler.print();
+        //app_state.profiler.print();
     }
 }
 

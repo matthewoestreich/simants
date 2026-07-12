@@ -30,15 +30,6 @@ impl World {
     pub fn update(&mut self, delta_time: f32, rng: &mut SmallRng, profiler: &mut Profiler) {
         self.colony.update_spawning(delta_time, rng);
 
-        let profiler_clear_food_scope = profiler.scope("Grid (clear food):");
-        self.grid
-            .par_iter_mut()
-            .filter(|cell| cell.terrain == Terrain::Food && cell.food <= 0.0)
-            .for_each(|no_food_remaining_cell| {
-                no_food_remaining_cell.terrain = Terrain::Empty;
-            });
-        drop(profiler_clear_food_scope);
-
         let profiler_phero_evap_scope = profiler.scope("Grid (phero evap):");
         self.grid
             .par_iter_mut()
@@ -46,7 +37,7 @@ impl World {
                 cell.terrain == Terrain::Empty && (cell.to_food > 0.0 || cell.to_home > 0.0)
             })
             .for_each(|phero_cell| {
-                phero_cell.evaporate(delta_time, PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT);
+                phero_cell.evaporate(delta_time, PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT)
             });
         drop(profiler_phero_evap_scope);
 
@@ -72,6 +63,9 @@ impl World {
                 if ant.is_foraging() && current_cell.has_food() {
                     let harvested_amount = ant.harvest(current_cell.food, rng);
                     current_cell.food = (current_cell.food - harvested_amount).max(0.0);
+                    if current_cell.food <= 0.0 {
+                        current_cell.terrain = Terrain::Empty;
+                    }
                     ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                 }
                 // Deliver food to colony
