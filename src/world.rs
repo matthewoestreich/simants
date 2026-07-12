@@ -28,20 +28,27 @@ impl World {
     }
 
     pub fn update(&mut self, delta_time: f32, rng: &mut SmallRng, profiler: &mut Profiler) {
-        if !self.colony.is_at_max_population() {
-            self.colony.update_spawning(delta_time, rng);
-        }
+        self.colony.update_spawning(delta_time, rng);
 
-        for cell in self.grid.iter_mut() {
-            let _s = profiler.scope("Grid (phero evap, etc):");
-            match cell.terrain {
-                Terrain::Food if cell.food <= 0.0 => cell.terrain = Terrain::Empty,
-                Terrain::Empty => {
-                    cell.evaporate(delta_time, PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT)
-                }
-                _ => {}
-            }
-        }
+        let profiler_clear_food_scope = profiler.scope("Grid (clear food):");
+        self.grid
+            .par_iter_mut()
+            .filter(|cell| cell.terrain == Terrain::Food && cell.food <= 0.0)
+            .for_each(|no_food_remaining_cell| {
+                no_food_remaining_cell.terrain = Terrain::Empty;
+            });
+        drop(profiler_clear_food_scope);
+
+        let profiler_phero_evap_scope = profiler.scope("Grid (phero evap):");
+        self.grid
+            .par_iter_mut()
+            .filter(|cell| {
+                cell.terrain == Terrain::Empty && (cell.to_food > 0.0 || cell.to_home > 0.0)
+            })
+            .for_each(|phero_cell| {
+                phero_cell.evaporate(delta_time, PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT);
+            });
+        drop(profiler_phero_evap_scope);
 
         let colony_center = self.colony.position;
 
@@ -52,13 +59,13 @@ impl World {
             //    continue;
             //}
 
-            let cs_scope = profiler.scope("Sense Environment:");
+            let profiler_sense_scope = profiler.scope("Sense Environment:");
             let current_cell = ant.sense_environment(&mut self.grid);
-            drop(cs_scope);
+            drop(profiler_sense_scope);
 
-            let expl_scope = profiler.scope("Exploring Check:");
+            let profiler_explore_scope = profiler.scope("Exploring Check:");
             let is_exploring = ant.explore(delta_time, rng);
-            drop(expl_scope);
+            drop(profiler_explore_scope);
 
             if !is_exploring {
                 // Gather food
@@ -117,7 +124,7 @@ impl World {
             let separation_weight = ANT_SEPARATION_WEIGHT; // Controls boundary stiffness
 
             for _ in 0..pbd_iterations {
-                let _s = profiler.scope("PBD Collision Resolution:");
+                let _s = profiler.scope("PBD Collisions:");
 
                 let displacements: Vec<Vector2> = self
                     .colony
@@ -180,8 +187,8 @@ impl World {
         if strength <= 0.0 {
             return 0.0;
         }
-        let factor = f32::exp(-decay_rate * delta_time);
-        let amount = strength * factor;
+        let decay_factor = f32::exp(-decay_rate * delta_time);
+        let amount = strength * decay_factor;
         if amount < 0.1 {
             return 0.0;
         }

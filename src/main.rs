@@ -125,7 +125,7 @@ fn main() {
         title: "Debug".into(),
         tab_position: Vector2::new((WINDOW_WIDTH - 550) as f32, 0.0),
         tab_size: Vector2::new(80.0, 22.0),
-        panel_size: Vector2::new(550.0, 340.0),
+        panel_size: Vector2::new(550.0, 350.0),
         render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle, state: &mut AppState| {
             let panel_x = panel.x as i32;
             let panel_y = panel.y as i32;
@@ -261,6 +261,7 @@ fn main() {
         }
 
         gui.draw(&mut d, &mut app_state);
+        app_state.profiler.print();
     }
 }
 

@@ -4,6 +4,7 @@ use crate::{
     world::World,
 };
 use raylib::ffi::Vector2;
+use rayon::iter::IntoParallelRefMutIterator;
 
 /* ------------------------------------------------------------------------------ */
 /* ---------------- Grid -------------------------------------------------------- */
@@ -44,6 +45,10 @@ impl Grid {
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Cell> {
         self.cells.iter_mut()
+    }
+
+    pub fn par_iter_mut(&mut self) -> rayon::slice::IterMut<'_, Cell> {
+        self.cells.par_iter_mut()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Cell> {
