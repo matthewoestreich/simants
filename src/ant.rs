@@ -190,15 +190,15 @@ impl Ant {
 
         self.sensors.left = Sensor {
             location: Some(left_loc),
-            reading: grid.sample_position_with_pheromone_bias(left_loc, self.state),
+            reading: grid.sample_cell(left_loc, self.state),
         };
         self.sensors.center = Sensor {
             location: Some(center_loc),
-            reading: grid.sample_position_with_pheromone_bias(center_loc, self.state),
+            reading: grid.sample_cell(center_loc, self.state),
         };
         self.sensors.right = Sensor {
             location: Some(right_loc),
-            reading: grid.sample_position_with_pheromone_bias(right_loc, self.state),
+            reading: grid.sample_cell(right_loc, self.state),
         };
 
         grid.get_cell_mut(

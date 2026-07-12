@@ -145,53 +145,38 @@ impl Grid {
         (y * self.cols + x) as usize
     }
 
-    pub fn sample_position(&self, position: Vector2) -> CellSample {
+    /// Samples a position and only fills out pheromone strength for the appropriate
+    /// pheromone based upon ant state. For example, if ant is currently returning food
+    /// the target pheromone would be the "to home" pheromone.
+    pub fn sample_cell(&self, position: Vector2, ant_state: AntState) -> CellSample {
         let (x, y) = self.world_to_cell(position);
 
-        if let Some(c) = self.get_cell(x, y) {
+        let Some(cell) = self.get_cell(x, y) else {
             return CellSample {
-                terrain: c.terrain,
-                to_food_strength: c.to_food,
-                to_home_strength: c.to_home,
-                food_amount: c.food,
-                ..CellSample::default()
+                terrain: Terrain::Invalid,
+                target_pheromone: 0.0,
             };
-        }
-
-        CellSample {
-            terrain: Terrain::Invalid,
-            ..CellSample::default()
-        }
-    }
-
-    /// Samples a position and only fills out pheromone strength for the appropriate
-    /// pheromone based upon ant state
-    pub fn sample_position_with_pheromone_bias(
-        &self,
-        position: Vector2,
-        ant_state: AntState,
-    ) -> CellSample {
-        let mut this = self.sample_position(position);
-        if this.terrain.is_invalid() {
-            return this;
-        }
-
-        match ant_state {
-            AntState::Foraging => {
-                this.target_pheromone = this.to_food_strength;
-                if this.terrain.is_food() {
-                    this.target_pheromone += 1000.0;
-                }
-            }
-            AntState::ReturningFood => {
-                this.target_pheromone = this.to_home_strength;
-                if this.terrain.is_colony() {
-                    this.target_pheromone += 1000.0;
-                }
-            }
         };
 
-        this
+        CellSample {
+            terrain: cell.terrain,
+            target_pheromone: match ant_state {
+                AntState::Foraging => {
+                    let mut food_strength = cell.to_food;
+                    if cell.terrain.is_food() {
+                        food_strength += 1000.0;
+                    }
+                    food_strength
+                }
+                AntState::ReturningFood => {
+                    let mut home_strength = cell.to_home;
+                    if cell.terrain.is_colony() {
+                        home_strength += 1000.0;
+                    }
+                    home_strength
+                }
+            },
+        }
     }
 }
 
@@ -202,10 +187,7 @@ impl Grid {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CellSample {
     pub terrain: Terrain,
-    pub to_food_strength: f32,
-    pub to_home_strength: f32,
     pub target_pheromone: f32,
-    pub food_amount: f32,
 }
 
 /* ------------------------------------------------------------------------------ */
