@@ -4,16 +4,20 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Profiler {
     sections: RefCell<HashMap<&'static str, ProfileSection>>,
+    update_interval: Duration,
+    last_update: Instant,
 }
 
 #[derive(Debug, Default)]
 pub struct ProfileSection {
     pub total: Duration,
     pub frame: Duration,
+    pub accumulated: Duration,
     pub calls: u64,
+    pub accumulated_calls: u64,
 }
 
 pub struct ProfileScope<'a> {
@@ -23,8 +27,12 @@ pub struct ProfileScope<'a> {
 }
 
 impl Profiler {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(interval_seconds: f32) -> Self {
+        Self {
+            sections: RefCell::new(HashMap::new()),
+            update_interval: Duration::from_secs_f32(interval_seconds),
+            last_update: Instant::now(),
+        }
     }
 
     pub fn sections(&self) -> Ref<'_, HashMap<&'static str, ProfileSection>> {
@@ -36,6 +44,23 @@ impl Profiler {
         for section in self.sections.borrow_mut().values_mut() {
             section.frame = Duration::ZERO;
             section.calls = 0;
+        }
+    }
+
+    pub fn end_frame(&mut self) {
+        let now = Instant::now();
+
+        for section in self.sections.borrow_mut().values_mut() {
+            if now.duration_since(self.last_update) >= self.update_interval {
+                section.accumulated = section.frame;
+                section.accumulated_calls = section.calls;
+            }
+            section.frame = Duration::ZERO;
+            section.calls = 0;
+        }
+
+        if now.duration_since(self.last_update) >= self.update_interval {
+            self.last_update = now;
         }
     }
 
@@ -53,13 +78,17 @@ impl Profiler {
     pub fn print(&self) {
         println!("-----------------------------");
 
-        for (name, section) in self.sections.borrow().iter() {
-            println!(
+        let sections = self.sections.borrow();
+
+        for (name, section) in sections.iter() {
+            let t = format!(
                 "{:<20} {:>8.3} ms  calls: {}",
                 name,
-                section.frame.as_secs_f64() * 1000.0,
-                section.calls
+                section.accumulated.as_secs_f64() * 1000.0,
+                section.accumulated_calls
             );
+
+            println!("{t}");
         }
     }
 }

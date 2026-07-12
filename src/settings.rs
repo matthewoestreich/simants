@@ -8,7 +8,7 @@ use std::ops::Range;
 /* ----------------------------------- */
 
 // How many ants to initially render
-pub const NUM_ANTS: usize = 12_000;
+pub const NUM_ANTS: usize = 1_000;
 pub const PERCENT_OF_EXPLORER_ANTS: f32 = 0.0;
 // When an explorer ants time to explore runs out, it goes exploring.
 // We pick a random number in this range so not all ants go exploring at the same time.

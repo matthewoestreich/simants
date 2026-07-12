@@ -28,9 +28,10 @@ impl World {
     }
 
     pub fn update(&mut self, delta_time: f32, rng: &mut SmallRng, profiler: &mut Profiler) {
+        let _us = profiler.scope("1. Entire Update");
         self.colony.update_spawning(delta_time, rng);
 
-        let profiler_phero_evap_scope = profiler.scope("Grid (phero evap):");
+        let profiler_phero_evap_scope = profiler.scope("2. Grid (pheroEvap):");
         self.grid
             .par_iter_mut()
             .filter(|cell| {
@@ -41,6 +42,7 @@ impl World {
             });
         drop(profiler_phero_evap_scope);
 
+        let profiler_ant_loop_scope = profiler.scope("3. EntireAntLoop:");
         for ant in &mut self.colony.ants {
             //ant.handle_pause(delta_time, rng);
             //if ant.is_paused() {
@@ -48,11 +50,11 @@ impl World {
             //    continue;
             //}
 
-            let profiler_sense_scope = profiler.scope("Sense Environment:");
+            let profiler_sense_scope = profiler.scope("3.1. Sense Env:");
             let current_cell = ant.sense_environment(&mut self.grid);
             drop(profiler_sense_scope);
 
-            let profiler_explore_scope = profiler.scope("Exploring Check:");
+            let profiler_explore_scope = profiler.scope("3.2. ExploringCheck:");
             let is_exploring = ant.explore(delta_time, rng);
             drop(profiler_explore_scope);
 
@@ -82,30 +84,31 @@ impl World {
             }
 
             {
-                let _s = profiler.scope("Pheromone Placement:");
+                let _s = profiler.scope("3.3. Phero Plcmt:");
                 ant.try_place_pheromone(current_cell);
             }
 
             ant.previous_position = ant.navigator.position;
 
             {
-                let _s = profiler.scope("Steering Force:");
+                let _s = profiler.scope("3.4. Steering Force:");
                 ant.update_steering_force(delta_time, rng);
             }
 
             {
-                let _s = profiler.scope("Calc Next Pos:");
+                let _s = profiler.scope("3.5. Calc Next Pos:");
                 ant.navigator.calculate_next_position(delta_time);
             }
         }
+        drop(profiler_ant_loop_scope);
 
         {
-            let _s = profiler.scope("Clear Spatial Grid:");
+            let _s = profiler.scope("4. Clear Spatial Grid:");
             self.spatial_grid.clear();
         }
 
         {
-            let _s = profiler.scope("Ants-> Spatial Grid:");
+            let _s = profiler.scope("5. Ants->SpatialGrid:");
             for ant in &mut self.colony.ants {
                 self.spatial_grid
                     .insert(ant.id as u32, ant.navigator.position, ant.food > 0.0);
@@ -113,53 +116,52 @@ impl World {
         }
 
         {
-            let pbd_iterations = 1;
-            let separation_radius = ANT_SEPARATION_RADIUS;
-            let separation_weight = ANT_SEPARATION_WEIGHT; // Controls boundary stiffness
+            //for _ in 0..pbd_iterations {
+            let profiler_pbd_collisions_scope = profiler.scope("6. PBD Collisions:");
+            let displacements: Vec<Vector2> = self
+                .colony
+                .ants
+                .par_iter()
+                .map(|this_ant| {
+                    let mut displacement = Vector2::zero();
 
-            for _ in 0..pbd_iterations {
-                let _s = profiler.scope("PBD Collisions:");
+                    let this_ant_id = this_ant.id as usize;
+                    let this_ant_pos = this_ant.navigator.position;
+                    let this_ant_has_food = this_ant.food > 0.0;
 
-                let displacements: Vec<Vector2> = self
-                    .colony
-                    .ants
-                    .par_iter()
-                    .map(|this_ant| {
-                        let mut displacement = Vector2::zero();
+                    self.spatial_grid.for_each_neighbor(
+                        this_ant_pos,
+                        ANT_SEPARATION_RADIUS,
+                        |other_id, other_pos, other_has_food| {
+                            if other_id == this_ant_id {
+                                return;
+                            }
+                            if this_ant_has_food && !other_has_food {
+                                return;
+                            }
 
-                        let this_ant_id = this_ant.id as usize;
-                        let this_ant_pos = this_ant.navigator.position;
-                        let this_ant_has_food = this_ant.food > 0.0;
+                            let offset = this_ant_pos - other_pos;
+                            let distance = offset.length();
 
-                        self.spatial_grid.for_each_neighbor(
-                            this_ant_pos,
-                            separation_radius,
-                            |other_id, other_pos, other_has_food| {
-                                if other_id == this_ant_id {
-                                    return;
-                                }
-                                if this_ant_has_food && !other_has_food {
-                                    return;
-                                }
+                            if distance > 0.0 && distance < ANT_SEPARATION_RADIUS {
+                                let overlap = ANT_SEPARATION_RADIUS - distance;
+                                displacement += offset.normalize() * (overlap);
+                            }
+                        },
+                    );
 
-                                let offset = this_ant_pos - other_pos;
-                                let distance = offset.length();
+                    displacement * ANT_SEPARATION_WEIGHT // Controls boundary stiffness
+                })
+                .collect();
+            drop(profiler_pbd_collisions_scope);
 
-                                if distance > 0.0 && distance < separation_radius {
-                                    let overlap = separation_radius - distance;
-                                    displacement += offset.normalize() * (overlap);
-                                }
-                            },
-                        );
-
-                        displacement * separation_weight
-                    })
-                    .collect();
-
+            {
+                let _s = profiler.scope("7. SetPosViaDsplcmt:");
                 for (i, ant) in self.colony.ants.iter_mut().enumerate() {
                     ant.navigator.position += displacements[i];
                 }
             }
+            //}
         }
 
         {

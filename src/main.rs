@@ -29,7 +29,9 @@ use rand::rngs::SmallRng;
 use raylib::{
     RaylibHandle,
     ffi::{Camera2D, Color, KeyboardKey, MouseButton, Rectangle, Vector2},
-    prelude::{RaylibDraw as _, RaylibDrawHandle, RaylibMode2DExt as _, RaylibScissorModeExt},
+    prelude::{
+        Font, RaylibDraw as _, RaylibDrawHandle, RaylibMode2DExt as _, RaylibScissorModeExt,
+    },
 };
 
 struct AppState {
@@ -48,6 +50,7 @@ struct AppState {
     pub simulation_time: f32,
     pub fps: u32,
     pub profiler: Profiler,
+    pub font: Font,
 }
 
 fn main() {
@@ -58,11 +61,18 @@ fn main() {
 
     rl.set_target_fps(60);
 
+    let font = rl
+        .load_font(
+            &thread,
+            "assets/playfair-display-font/PlayfairDisplayBlack-RpvVA.ttf",
+        )
+        .expect("failed to load font");
+
     let ant_texture = rl
         .load_texture(&thread, "assets/ant.png")
         .expect("something went wrong loading ant texture");
 
-    let profiler = Profiler::new();
+    let profiler = Profiler::new(0.2);
 
     let mut app_state = AppState {
         is_paused: false,
@@ -74,6 +84,7 @@ fn main() {
         simulation_time: 0.0,
         fps: 0,
         profiler,
+        font,
     };
 
     let viewport = Viewport::new(
@@ -116,6 +127,8 @@ fn main() {
         zoom: 1.0,
     };
 
+    let debug_panel_width = 360;
+    let debug_panel_height = 380.0;
     let debug_panel = SlidePanel {
         side: DockSide::Top,
         open: false,
@@ -123,58 +136,39 @@ fn main() {
         current_size: 0.0,
         speed: 800.0,
         title: "Debug".into(),
-        tab_position: Vector2::new((WINDOW_WIDTH - 550) as f32, 0.0),
+        tab_position: Vector2::new((WINDOW_WIDTH - debug_panel_width) as f32, 0.0),
         tab_size: Vector2::new(80.0, 22.0),
-        panel_size: Vector2::new(550.0, 350.0),
+        panel_size: Vector2::new(debug_panel_width as f32, debug_panel_height),
         render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle, state: &mut AppState| {
-            let panel_x = panel.x as i32;
-            let panel_y = panel.y as i32;
-            let text_x = panel_x + 5;
-            let font_size = 20;
+            let font_size = 20.0;
             let color = Color::BLACK;
-            let mut text_y = panel_y + 10;
+            let spacing = 1.0;
+            let mut text_pos = Vector2::new(panel.x + 5.0, panel.y + 10.0);
 
             for (name, section) in state.profiler.sections().iter() {
                 let t = format!(
                     "{:<20} {:>8.3} ms  calls: {}",
                     name,
-                    section.frame.as_secs_f64() * 1000.0,
-                    section.calls
+                    section.accumulated.as_secs_f64() * 1000.0,
+                    section.accumulated_calls
                 );
-                d.draw_text(&t, text_x, text_y, font_size, color);
-                text_y += font_size;
+                d.draw_text_ex(&state.font, &t, text_pos, font_size, spacing, color);
+                text_pos.y += font_size - 1.0;
             }
 
-            d.draw_text(
+            let customs = [
                 &format!("FPS: {}", state.fps),
-                text_x,
-                text_y,
-                font_size,
-                color,
-            );
-
-            text_y += font_size;
-
-            d.draw_text(
                 &format!(
                     "Rows='{GRID_ROWS}' Columns='{GRID_COLS}' Cells='{}'",
                     GRID_ROWS * GRID_COLS
                 ),
-                text_x,
-                text_y,
-                font_size,
-                color,
-            );
-
-            text_y += font_size;
-
-            d.draw_text(
                 &format!("Number of Ants: {NUM_ANTS}"),
-                text_x,
-                text_y,
-                font_size,
-                color,
-            );
+            ];
+
+            for custom in customs {
+                d.draw_text_ex(&state.font, custom, text_pos, font_size, spacing, color);
+                text_pos.y += font_size - 1.0;
+            }
         },
     };
 
@@ -261,6 +255,7 @@ fn main() {
         }
 
         gui.draw(&mut d, &mut app_state);
+        app_state.profiler.end_frame();
         app_state.profiler.print();
     }
 }
