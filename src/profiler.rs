@@ -1,12 +1,12 @@
 use std::{
-    cell::RefCell,
+    cell::{Ref, RefCell},
     collections::HashMap,
     time::{Duration, Instant},
 };
 
 #[derive(Debug, Default)]
 pub struct Profiler {
-    pub sections: RefCell<HashMap<&'static str, ProfileSection>>,
+    sections: RefCell<HashMap<&'static str, ProfileSection>>,
 }
 
 #[derive(Debug, Default)]
@@ -25,6 +25,10 @@ pub struct ProfileScope<'a> {
 impl Profiler {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn sections(&self) -> Ref<'_, HashMap<&'static str, ProfileSection>> {
+        self.sections.borrow()
     }
 
     /// Reset per-frame timings.

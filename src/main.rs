@@ -134,7 +134,7 @@ fn main() {
             let color = Color::BLACK;
             let mut text_y = panel_y + 10;
 
-            for (name, section) in state.profiler.sections.borrow().iter() {
+            for (name, section) in state.profiler.sections().iter() {
                 let t = format!(
                     "{:<20} {:>8.3} ms  calls: {}",
                     name,
