@@ -1,11 +1,12 @@
 use std::{
+    cell::RefCell,
     collections::HashMap,
     time::{Duration, Instant},
 };
 
 #[derive(Debug, Default)]
 pub struct Profiler {
-    pub sections: HashMap<&'static str, ProfileSection>,
+    pub sections: RefCell<HashMap<&'static str, ProfileSection>>,
 }
 
 #[derive(Debug, Default)]
@@ -16,7 +17,7 @@ pub struct ProfileSection {
 }
 
 pub struct ProfileScope<'a> {
-    profiler: &'a mut Profiler,
+    profiler: &'a Profiler,
     name: &'static str,
     start: Instant,
 }
@@ -28,7 +29,7 @@ impl Profiler {
 
     /// Reset per-frame timings.
     pub fn begin_frame(&mut self) {
-        for section in self.sections.values_mut() {
+        for section in self.sections.borrow_mut().values_mut() {
             section.frame = Duration::ZERO;
             section.calls = 0;
         }
@@ -36,7 +37,7 @@ impl Profiler {
 
     /// Create a scoped timer.
     /// Time is recorded when the returned value is dropped.
-    pub fn scope(&mut self, name: &'static str) -> ProfileScope<'_> {
+    pub fn scope(&self, name: &'static str) -> ProfileScope<'_> {
         ProfileScope {
             profiler: self,
             name,
@@ -48,7 +49,7 @@ impl Profiler {
     pub fn print(&self) {
         println!("-----------------------------");
 
-        for (name, section) in &self.sections {
+        for (name, section) in self.sections.borrow().iter() {
             println!(
                 "{:<20} {:>8.3} ms  calls: {}",
                 name,
@@ -63,8 +64,9 @@ impl Drop for ProfileScope<'_> {
     fn drop(&mut self) {
         let elapsed = self.start.elapsed();
 
-        let section = self.profiler.sections.entry(self.name).or_default();
+        let mut sections = self.profiler.sections.borrow_mut();
 
+        let section = sections.entry(self.name).or_default();
         section.frame += elapsed;
         section.total += elapsed;
         section.calls += 1;

@@ -41,8 +41,6 @@ impl World {
             });
         drop(profiler_phero_evap_scope);
 
-        let colony_center = self.colony.position;
-
         for ant in &mut self.colony.ants {
             //ant.handle_pause(delta_time, rng);
             //if ant.is_paused() {
@@ -70,11 +68,13 @@ impl World {
                 }
                 // Deliver food to colony
                 else if ant.is_returning_food() && current_cell.is_colony() {
-                    if ant.navigator.position.distance_sqr(colony_center) <= self.colony.radius {
+                    if ant.navigator.position.distance_sqr(self.colony.position)
+                        <= self.colony.radius
+                    {
                         self.colony.harvested_food += ant.deliver_food();
                         ant.set_pheromone_tank(ANT_MAX_PHEROMONE_CAPACITY);
                     } else {
-                        ant.navigator.seek(colony_center);
+                        ant.navigator.seek(self.colony.position);
                         ant.navigator.calculate_next_position(delta_time);
                         continue;
                     }
@@ -105,8 +105,8 @@ impl World {
         }
 
         {
+            let _s = profiler.scope("Ants-> Spatial Grid:");
             for ant in &mut self.colony.ants {
-                let _s = profiler.scope("Ant -> Spatial Grid:");
                 self.spatial_grid
                     .insert(ant.id as u32, ant.navigator.position, ant.food > 0.0);
             }
