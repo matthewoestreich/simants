@@ -64,7 +64,7 @@ fn main() {
     let font = rl
         .load_font(
             &thread,
-            "assets/playfair-display-font/PlayfairDisplayBlack-RpvVA.ttf",
+            "assets/playfair-display-font/PlayfairDisplayBold-nRv8g.ttf",
         )
         .expect("failed to load font");
 
@@ -128,19 +128,19 @@ fn main() {
     };
 
     let debug_panel_width = 360;
-    let debug_panel_height = 380.0;
+    let debug_panel_height = 510.0;
     let debug_panel = SlidePanel {
         side: DockSide::Top,
         open: false,
         enabled: true,
         current_size: 0.0,
-        speed: 800.0,
+        speed: 900.0,
         title: "Debug".into(),
         tab_position: Vector2::new((WINDOW_WIDTH - debug_panel_width) as f32, 0.0),
         tab_size: Vector2::new(80.0, 22.0),
         panel_size: Vector2::new(debug_panel_width as f32, debug_panel_height),
         render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle, state: &mut AppState| {
-            let font_size = 20.0;
+            let font_size = 21.0;
             let color = Color::BLACK;
             let spacing = 1.0;
             let mut text_pos = Vector2::new(panel.x + 5.0, panel.y + 10.0);
@@ -153,7 +153,7 @@ fn main() {
                     section.accumulated_calls
                 );
                 d.draw_text_ex(&state.font, &t, text_pos, font_size, spacing, color);
-                text_pos.y += font_size - 1.0;
+                text_pos.y += font_size;
             }
 
             let customs = [
@@ -167,7 +167,7 @@ fn main() {
 
             for custom in customs {
                 d.draw_text_ex(&state.font, custom, text_pos, font_size, spacing, color);
-                text_pos.y += font_size - 1.0;
+                text_pos.y += font_size;
             }
         },
     };

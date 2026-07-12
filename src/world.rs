@@ -31,7 +31,7 @@ impl World {
         let _us = profiler.scope("1. Entire Update");
         self.colony.update_spawning(delta_time, rng);
 
-        let profiler_phero_evap_scope = profiler.scope("2. Grid (pheroEvap):");
+        let profiler_phero_evap_scope = profiler.scope("2. Grid (pheroEvap)");
         self.grid
             .par_iter_mut()
             .filter(|cell| {
@@ -42,7 +42,7 @@ impl World {
             });
         drop(profiler_phero_evap_scope);
 
-        let profiler_ant_loop_scope = profiler.scope("3. EntireAntLoop:");
+        let profiler_ant_loop_scope = profiler.scope("3. EntireAntLoop");
         for ant in &mut self.colony.ants {
             //ant.handle_pause(delta_time, rng);
             //if ant.is_paused() {
@@ -50,11 +50,11 @@ impl World {
             //    continue;
             //}
 
-            let profiler_sense_scope = profiler.scope("3.1. Sense Env:");
+            let profiler_sense_scope = profiler.scope("3.1. Sense Env");
             let current_cell = ant.sense_environment(&mut self.grid);
             drop(profiler_sense_scope);
 
-            let profiler_explore_scope = profiler.scope("3.2. ExploringCheck:");
+            let profiler_explore_scope = profiler.scope("3.2. ExploringCheck");
             let is_exploring = ant.explore(delta_time, rng);
             drop(profiler_explore_scope);
 
@@ -84,19 +84,19 @@ impl World {
             }
 
             {
-                let _s = profiler.scope("3.3. Phero Plcmt:");
+                let _s = profiler.scope("3.3. Phero Plcmt");
                 ant.try_place_pheromone(current_cell);
             }
 
             ant.previous_position = ant.navigator.position;
 
             {
-                let _s = profiler.scope("3.4. Steering Force:");
+                let _s = profiler.scope("3.4. Steering Force");
                 ant.update_steering_force(delta_time, rng);
             }
 
             {
-                let _s = profiler.scope("3.5. Calc Next Pos:");
+                let _s = profiler.scope("3.5. Calc Next Pos");
                 ant.navigator.calculate_next_position(delta_time);
             }
         }
