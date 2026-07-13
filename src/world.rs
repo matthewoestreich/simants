@@ -116,7 +116,6 @@ impl World {
         }
 
         {
-            //for _ in 0..pbd_iterations {
             let profiler_pbd_collisions_scope = profiler.scope("6. PBD Collisions");
             let displacements: Vec<Vector2> = self
                 .colony
@@ -161,12 +160,11 @@ impl World {
                     ant.navigator.position += displacements[i];
                 }
             }
-            //}
         }
 
         {
             let _s = profiler.scope("8. Final Speeds");
-            for ant in &mut self.colony.ants {
+            for ant in self.colony.ants.iter_mut() {
                 let actual_displacement = ant.navigator.position - ant.previous_position;
                 let distance_moved = actual_displacement.length();
                 if delta_time > 0.0 {

@@ -186,6 +186,7 @@ fn main() {
     /* --------------------------------------- */
     while !rl.window_should_close() {
         app_state.profiler.begin_frame();
+
         if !gui.blocks_mouse(rl.get_mouse_position()) {
             handle_world_click(
                 &mut world,
@@ -218,15 +219,6 @@ fn main() {
             }
         }
 
-        let t = calc_game_time(app_state.simulation_time);
-        d.draw_text(
-            &format!("Time: {}:{}:{}", t.0, t.1, t.2),
-            WORLD_WIDTH / 2,
-            10,
-            20,
-            Color::WHITE,
-        );
-
         {
             let mut scissor = d.begin_scissor_mode(
                 renderer.viewport.x,
@@ -238,14 +230,10 @@ fn main() {
             renderer.draw_world(&mut world, &mut mode2d, &mut app_state.profiler);
         }
 
-        // Bordr around viewport
-        d.draw_rectangle_lines(
-            renderer.viewport.x,
-            renderer.viewport.y,
-            renderer.viewport.width,
-            renderer.viewport.height,
-            Color::RED,
-        );
+        app_state.profiler.end_frame();
+
+        draw_sim_time(&mut d, app_state.simulation_time);
+        draw_border(&mut d, &renderer.viewport);
 
         if app_state.is_pheromone_mode {
             d.draw_text("PHEROMONE MODE ON", 10, 10, 20, Color::WHITE);
@@ -255,7 +243,6 @@ fn main() {
         }
 
         gui.draw(&mut d, &mut app_state);
-        app_state.profiler.end_frame();
         app_state.profiler.print();
     }
 }
@@ -271,15 +258,29 @@ fn handle_world_click(
     camera: &mut Camera2D,
     app_state: &mut AppState,
 ) {
-    if renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
-        handle_key_press(rl, renderer, app_state);
-        handle_mouse_wheel(rl, camera, renderer);
-        handle_mouse_click(rl, camera, world, &renderer.viewport, app_state);
+    if !renderer.viewport.is_within_bounds(rl.get_mouse_position()) {
+        return;
     }
+    handle_key_press(rl, renderer, app_state);
+    handle_mouse_wheel(rl, camera, renderer);
+    handle_mouse_click(rl, camera, world, &renderer.viewport, app_state);
+}
+
+fn draw_border(d: &mut RaylibDrawHandle, vp: &Viewport) {
+    // Bordr around viewport
+    d.draw_rectangle_lines(vp.x, vp.y, vp.width, vp.height, Color::RED);
+}
+
+fn draw_sim_time(d: &mut RaylibDrawHandle<'_>, simulation_time: f32) {
+    let t = calc_sim_time(simulation_time);
+    let font_size = 20;
+    let txt = format!("Time: {:02}:{:02}:{:02}", t.0, t.1, t.2);
+    let pos_x = (WORLD_WIDTH / 2) + d.measure_text(&txt, font_size);
+    d.draw_text(&txt, pos_x, 10, font_size, Color::WHITE);
 }
 
 // Returns tuple of (i32, i32, i32) representng (hours, min, sec)
-fn calc_game_time(simulation_time: f32) -> (i32, i32, i32) {
+fn calc_sim_time(simulation_time: f32) -> (i32, i32, i32) {
     let total_seconds = simulation_time as i32;
     let hours = total_seconds / 3600;
     let minutes = (total_seconds / 60) % 60;
