@@ -40,7 +40,7 @@ impl Profiler {
     }
 
     /// Reset per-frame timings.
-    pub fn begin_frame(&mut self) {
+    pub fn begin_frame(&self) {
         for section in self.sections.borrow_mut().values_mut() {
             section.frame = Duration::ZERO;
             section.calls = 0;

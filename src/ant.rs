@@ -94,9 +94,9 @@ impl AntColony {
 #[derive(Default, Debug, Clone)]
 pub struct Sensor {
     /// Sensors location in world space
-    pub location: Option<Vector2>,
+    pub location: Vector2,
     /// What did this sensor pick up?
-    pub reading: CellSample,
+    pub sample: CellSample,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -189,16 +189,16 @@ impl Ant {
         let right_loc = self.navigator.position + (right_dir * sensor_distance);
 
         self.sensors.left = Sensor {
-            location: Some(left_loc),
-            reading: grid.sample_cell(left_loc, self.state),
+            location: left_loc,
+            sample: grid.sample_cell(left_loc, self.state),
         };
         self.sensors.center = Sensor {
-            location: Some(center_loc),
-            reading: grid.sample_cell(center_loc, self.state),
+            location: center_loc,
+            sample: grid.sample_cell(center_loc, self.state),
         };
         self.sensors.right = Sensor {
-            location: Some(right_loc),
-            reading: grid.sample_cell(right_loc, self.state),
+            location: right_loc,
+            sample: grid.sample_cell(right_loc, self.state),
         };
 
         grid.get_cell_mut(
@@ -230,15 +230,11 @@ impl Ant {
     }
 
     fn avoid_obstruction(&mut self, delta_time: f32, rng: &mut SmallRng) -> Option<Vector2> {
-        if self.sensors.center.reading.terrain.is_obstruction() {
+        if self.sensors.center.sample.terrain.is_obstruction() {
             Some(self.navigator.turn_around(0.1..30.0, delta_time, rng))
-        } else if self.sensors.left.reading.terrain.is_obstruction()
-            && let Some(_obs) = self.sensors.left.location
-        {
+        } else if self.sensors.left.sample.terrain.is_obstruction() {
             Some(self.navigator.turn_right(delta_time))
-        } else if self.sensors.right.reading.terrain.is_obstruction()
-            && let Some(_obs) = self.sensors.right.location
-        {
+        } else if self.sensors.right.sample.terrain.is_obstruction() {
             Some(self.navigator.turn_left(delta_time))
         } else {
             None
@@ -251,9 +247,9 @@ impl Ant {
     /// strongest value.
     // If the provided terrain is not sensed we return None and thereore do not change steering.
     fn sense_terrain(&self, t: Terrain) -> Option<Vector2> {
-        let left = self.sensors.left.reading;
-        let center = self.sensors.center.reading;
-        let right = self.sensors.right.reading;
+        let left = self.sensors.left.sample;
+        let center = self.sensors.center.sample;
+        let right = self.sensors.right.sample;
 
         // Use a negative value as a "flag" for if the expected terrain was even found.
         let mut strongest = -1.0;
@@ -261,17 +257,17 @@ impl Ant {
 
         if left.terrain == t {
             strongest = left.target_pheromone;
-            sensed_location = self.sensors.left.location;
+            sensed_location = Some(self.sensors.left.location);
         }
         if center.terrain == t && (strongest < 0.0 || center.target_pheromone > strongest) {
             strongest = center.target_pheromone;
-            sensed_location = self.sensors.center.location;
+            sensed_location = Some(self.sensors.center.location);
         }
         if right.terrain == t {
             #[allow(unused_assignments)]
             if strongest < 0.0 || right.target_pheromone > strongest {
                 strongest = right.target_pheromone;
-                sensed_location = self.sensors.right.location;
+                sensed_location = Some(self.sensors.right.location);
             }
         }
 
@@ -281,27 +277,27 @@ impl Ant {
     /// Steers towards strongest target pheromone. If the strongest value is still 0.0,
     /// it means we did not sense the target pheromone, so we return None
     fn steer_towards_pheromone(&self, rng: &mut SmallRng) -> Option<Vector2> {
-        let left = self.sensors.left.reading.target_pheromone;
-        let center = self.sensors.center.reading.target_pheromone;
-        let right = self.sensors.right.reading.target_pheromone;
+        let left = self.sensors.left.sample.target_pheromone;
+        let center = self.sensors.center.sample.target_pheromone;
+        let right = self.sensors.right.sample.target_pheromone;
 
         // Prefer center (the '>=' comparison)
         if center > 0.0 && center >= left && center >= right {
-            return self.sensors.center.location;
+            return Some(self.sensors.center.location);
         }
         if left > right {
-            return self.sensors.left.location;
+            return Some(self.sensors.left.location);
         }
         if right > left {
-            return self.sensors.right.location;
+            return Some(self.sensors.right.location);
         }
         // If left and right are equal, and at least one of them is > 0.0 (implicitly making both
         // of them > 0.0), randomly pick one.
         if left > 0.0 && left == right {
             if rng.random() {
-                return self.sensors.left.location;
+                return Some(self.sensors.left.location);
             }
-            return self.sensors.right.location;
+            return Some(self.sensors.right.location);
         }
 
         None // They're all 0s, target pheromone was not sensed

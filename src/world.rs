@@ -4,7 +4,7 @@ use crate::{
     profiler::Profiler,
     settings::{
         ANT_MAX_PHEROMONE_CAPACITY, ANT_SEPARATION_RADIUS, ANT_SEPARATION_WEIGHT,
-        PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT,
+        PERCENT_OF_EXPLORER_ANTS, PHEROMONE_EVAPORATION_RATE_IN_ENVIRONMENT,
     },
 };
 use rand::rngs::SmallRng;
@@ -27,7 +27,7 @@ impl World {
         }
     }
 
-    pub fn update(&mut self, delta_time: f32, rng: &mut SmallRng, profiler: &mut Profiler) {
+    pub fn update(&mut self, delta_time: f32, rng: &mut SmallRng, profiler: &Profiler) {
         let _us = profiler.scope("1. Entire Update");
         self.colony.update_spawning(delta_time, rng);
 
@@ -55,7 +55,7 @@ impl World {
             drop(profiler_sense_scope);
 
             let profiler_explore_scope = profiler.scope("3.2. ExploringCheck");
-            let is_exploring = ant.explore(delta_time, rng);
+            let is_exploring = PERCENT_OF_EXPLORER_ANTS > 0.0 && ant.explore(delta_time, rng);
             drop(profiler_explore_scope);
 
             if !is_exploring {

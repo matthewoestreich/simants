@@ -127,8 +127,10 @@ fn main() {
         zoom: 1.0,
     };
 
+    let tab_width = 80.0;
+    let tab_height = 22.0;
     let debug_panel_width = 360;
-    let debug_panel_height = 410.0;
+    let debug_panel_height = WINDOW_HEIGHT as f32 - tab_height;
     let debug_panel = SlidePanel {
         side: DockSide::Top,
         open: false,
@@ -137,7 +139,7 @@ fn main() {
         speed: 900.0,
         title: "Debug".into(),
         tab_position: Vector2::new((WINDOW_WIDTH - debug_panel_width) as f32, 0.0),
-        tab_size: Vector2::new(80.0, 22.0),
+        tab_size: Vector2::new(tab_width, tab_height),
         panel_size: Vector2::new(debug_panel_width as f32, debug_panel_height),
         render_contents: |d: &mut RaylibDrawHandle, panel: Rectangle, state: &mut AppState| {
             let font_size = 21.0;
@@ -156,30 +158,50 @@ fn main() {
                 text_pos.y += font_size;
             }
 
-            let customs = [
+            [
                 &format!("FPS: {}", state.fps),
                 &format!(
                     "Rows='{GRID_ROWS}' Columns='{GRID_COLS}' Cells='{}'",
                     GRID_ROWS * GRID_COLS
                 ),
                 &format!("Number of Ants: {NUM_ANTS}"),
-            ];
-
-            for custom in customs {
-                d.draw_text_ex(&state.font, custom, text_pos, font_size, spacing, color);
+            ]
+            .iter()
+            .for_each(|el| {
+                d.draw_text_ex(&state.font, el, text_pos, font_size, spacing, color);
                 text_pos.y += font_size;
-            }
+            });
         },
     };
 
     let mut gui = Gui::new();
     gui.register(debug_panel);
 
-    println!("Ant        {}", size_of::<ant::Ant>());
-    println!("Navigator  {}", size_of::<crate::reynolds::Navigation>());
-    println!("Sensors    {}", size_of::<ant::Sensors>());
-    println!("Sensor     {}", size_of::<ant::Sensor>());
-    println!("Vector2    {}", size_of::<Vector2>());
+    println!(
+        "Ant\n\tsize={}\n\talignment={}",
+        size_of::<ant::Ant>(),
+        align_of::<ant::Ant>()
+    );
+    println!(
+        "Navigator\n\tsize={}\n\talignment={}",
+        size_of::<crate::reynolds::Navigation>(),
+        align_of::<crate::reynolds::Navigation>()
+    );
+    println!(
+        "Sensors\n\tsize={}\n\talignment={}",
+        size_of::<ant::Sensors>(),
+        align_of::<ant::Sensors>()
+    );
+    println!(
+        "Sensor\n\tsize={}\n\talignment={}",
+        size_of::<ant::Sensor>(),
+        align_of::<ant::Sensor>()
+    );
+    println!(
+        "Vector2\n\tsize={}\n\talignment={}",
+        size_of::<Vector2>(),
+        align_of::<Vector2>()
+    );
 
     /* --------------------------------------- */
     /* ------------ Game Loop ---------------- */
@@ -211,11 +233,11 @@ fn main() {
                 dt = 0.01666667; // stabilize dt
                 for _ in 0..app_state.fast_forward_speed {
                     app_state.simulation_time += dt;
-                    world.update(dt, &mut rng, &mut app_state.profiler);
+                    world.update(dt, &mut rng, &app_state.profiler);
                 }
             } else {
                 app_state.simulation_time += dt;
-                world.update(dt, &mut rng, &mut app_state.profiler);
+                world.update(dt, &mut rng, &app_state.profiler);
             }
         }
 
@@ -274,8 +296,8 @@ fn draw_border(d: &mut RaylibDrawHandle, vp: &Viewport) {
 fn draw_sim_time(d: &mut RaylibDrawHandle<'_>, simulation_time: f32) {
     let t = calc_sim_time(simulation_time);
     let font_size = 20;
-    let txt = format!("Time: {:02}:{:02}:{:02}", t.0, t.1, t.2);
-    let pos_x = (WORLD_WIDTH / 2) + d.measure_text(&txt, font_size);
+    let txt = format!("{:02}:{:02}:{:02}", t.0, t.1, t.2);
+    let pos_x = (WINDOW_WIDTH / 2) - (d.measure_text(&txt, font_size) / 2);
     d.draw_text(&txt, pos_x, 10, font_size, Color::WHITE);
 }
 

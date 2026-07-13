@@ -117,10 +117,10 @@ impl Grid {
     }
 
     pub fn world_to_cell(&self, position: Vector2) -> (u32, u32) {
-        let x = (position.x.floor() as i32).clamp(0, self.cols as i32 - 1);
-        let y = (position.y.floor() as i32).clamp(0, self.rows as i32 - 1);
-
-        (x as u32, y as u32)
+        //let x = (position.x.floor() as i32).clamp(0, self.cols as i32 - 1);
+        //let y = (position.y.floor() as i32).clamp(0, self.rows as i32 - 1);
+        //(x as u32, y as u32)
+        (position.x as u32, position.y as u32)
     }
 
     pub fn get_cell(&self, x: u32, y: u32) -> Option<&Cell> {

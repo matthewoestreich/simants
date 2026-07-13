@@ -94,6 +94,7 @@ impl Navigation {
 
     /// Directly forces a lateral banking turn, scales the
     /// internal wander angle to match, updates physics
+    /// Returns updated position.
     pub fn turn_right(&mut self, delta_time: f32) -> Vector2 {
         let forward = if self.velocity.length_sqr() > 0.0 {
             self.velocity.normalize()
@@ -115,6 +116,7 @@ impl Navigation {
 
     /// Directly forces a lateral banking turn to the left,
     /// scales the internal wander angle counter-clockwise, updates physics.
+    /// Returns updated position.
     pub fn turn_left(&mut self, delta_time: f32) -> Vector2 {
         let forward = if self.velocity.length_sqr() > 0.0 {
             self.velocity.normalize()
@@ -134,8 +136,8 @@ impl Navigation {
         self.position
     }
 
-    /// Instantly flips velocity and wander vectors 180 degrees,
-    /// processes the physical position step.
+    /// Instantly flips velocity and wander vectors 180 degrees, processes the physical position step.
+    /// Returns updated position.
     pub fn turn_around(
         &mut self,
         panic_angle: Range<f32>,

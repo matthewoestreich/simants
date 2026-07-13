@@ -204,22 +204,16 @@ impl Renderer {
 
         if self.show_ant_sensors {
             sensor_color.a = 150; // semi-transparent
-            let size = Vector2::new(2.0, 2.0);
 
+            let size = Vector2::new(2.0, 2.0);
             let sensors = ant.get_sensors();
 
-            if let Some(l) = sensors.left.location {
-                let pos = self.viewport.grid_to_world(Vector2::new(l.x, l.y));
-                d.draw_line_v(ant_pos, pos, sensor_color);
-                d.draw_rectangle_v(pos, size, sensor_color);
-            }
-            if let Some(c) = sensors.center.location {
-                let pos = self.viewport.grid_to_world(Vector2::new(c.x, c.y));
-                d.draw_line_v(ant_pos, pos, sensor_color);
-                d.draw_rectangle_v(pos, size, sensor_color);
-            }
-            if let Some(r) = sensors.right.location {
-                let pos = self.viewport.grid_to_world(Vector2::new(r.x, r.y));
+            for s in [
+                sensors.left.location,
+                sensors.center.location,
+                sensors.right.location,
+            ] {
+                let pos = self.viewport.grid_to_world(Vector2::new(s.x, s.y));
                 d.draw_line_v(ant_pos, pos, sensor_color);
                 d.draw_rectangle_v(pos, size, sensor_color);
             }
